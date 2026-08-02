@@ -11,22 +11,28 @@ import com.aston728.engine.internals.devices.Cursor
 import com.aston728.engine.types.IntPosition
 import com.aston728.engine.types.IntSize
 
-internal class InternalWindow(shouldHaveDebugContext: Boolean) {
-    private var handle: Long = this.create(shouldHaveDebugContext)
+internal class InternalWindow(sharedHandle: Long?, shouldHaveDebugContext: Boolean) {
+    private var handle: Long = this.create(sharedHandle, shouldHaveDebugContext)
 
     private var savedPosition: IntPosition = if (this.exists()) { this.getPosition() } else { IntPosition() }
     private var savedSize: IntSize = if (this.exists()) { this.getSize() } else { IntSize() }
     private var minimumSize: IntSize? = null
     private var maximumSize: IntSize? = null
 
+    private var isVisible: Boolean = false
     private var isMinimized: Boolean = false
     private var isMaximized: Boolean = false
     private var isFullscreen: Boolean = false
 
-    private var cursor: Cursor = Cursor.ARROW
-    private var glfwCursor: Long = glfwCreateStandardCursor(this.cursor.toInt())
+    private var pendingPosition: IntPosition? = null
+    private var pendingSize: IntSize? = null
+    private var didUnminimize: Boolean = false
+    private var didUnmaximize: Boolean = false
 
-    private fun create(shouldHaveDebugContext: Boolean): Long {
+    private var cursor: Cursor = Cursor.ARROW
+    private var glfwCursor: Long = glfwCreateStandardCursor(this.cursor.toGLFWCursor())
+
+    private fun create(sharedHandle: Long?, shouldHaveDebugContext: Boolean): Long {
         glfwDefaultWindowHints()
 
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
@@ -36,7 +42,7 @@ internal class InternalWindow(shouldHaveDebugContext: Boolean) {
         if (shouldHaveDebugContext) { glfwWindowHint(GLFW_CONTEXT_DEBUG, GLFW_TRUE) }
 
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
-        return glfwCreateWindow(1, 1, "", NULL, NULL)
+        return glfwCreateWindow(1, 1, "", NULL, sharedHandle ?: NULL)
     }
 
     internal fun getHandle(): Long = this.handle
@@ -88,11 +94,7 @@ internal class InternalWindow(shouldHaveDebugContext: Boolean) {
     internal fun isMinimized(): Boolean = this.isMinimized
     internal fun isMaximized(): Boolean = this.isMaximized
     internal fun isFullscreen(): Boolean = this.isFullscreen
-    internal fun isNormal(): Boolean = (
-        glfwGetWindowAttrib(this.handle, GLFW_ICONIFIED) == 0 &&
-        glfwGetWindowAttrib(this.handle, GLFW_MAXIMIZED) == 0 &&
-        glfwGetWindowMonitor(this.handle) == NULL
-    )
+    internal fun isNormal(): Boolean = !(this.isMinimized || this.isMaximized || this.isFullscreen)
     internal fun getOpacity(): Float = glfwGetWindowOpacity(this.handle)
     internal fun isResizable(): Boolean = glfwGetWindowAttrib(this.handle, GLFW_RESIZABLE) != 0
     internal fun isBordered(): Boolean = glfwGetWindowAttrib(this.handle, GLFW_DECORATED) != 0
@@ -100,9 +102,11 @@ internal class InternalWindow(shouldHaveDebugContext: Boolean) {
     internal fun getCursor(): Cursor = this.cursor
 
     internal fun show(): InternalWindow = apply {
+        this.isVisible = true
         glfwShowWindow(this.handle)
     }
     internal fun hide(): InternalWindow = apply {
+        this.isVisible = false
         glfwHideWindow(this.handle)
     }
     internal fun setShouldClose(shouldClose: Boolean): InternalWindow = apply {
@@ -178,7 +182,7 @@ internal class InternalWindow(shouldHaveDebugContext: Boolean) {
     internal fun setCursor(cursor: Cursor): InternalWindow = apply {
         glfwDestroyCursor(this.glfwCursor)
         this.cursor = cursor
-        this.glfwCursor = glfwCreateStandardCursor(this.cursor.toInt())
+        this.glfwCursor = glfwCreateStandardCursor(this.cursor.toGLFWCursor())
         glfwSetCursor(this.handle, this.glfwCursor)
     }
     internal fun setOnCloseRequestCallback(callback: (Long) -> Unit): InternalWindow = apply {
@@ -225,11 +229,7 @@ internal class InternalWindow(shouldHaveDebugContext: Boolean) {
         // Reset states and apply new ones
 
         if (this.isFullscreen) {
-            glfwSetWindowMonitor(
-                this.handle, NULL,
-                0, 0, 1, 1,
-                GLFW_DONT_CARE
-            )
+            glfwSetWindowMonitor(this.handle, NULL, 0, 0, 1, 1, GLFW_DONT_CARE)
             this.isFullscreen = false
         }
         if (this.isMaximized) {
@@ -259,6 +259,8 @@ internal class InternalWindow(shouldHaveDebugContext: Boolean) {
         if (this.isMinimized) {
             glfwIconifyWindow(this.handle)
         }
+
+        if (!this.isVisible) { this.hide() }
     }
 
     internal fun onClose(): Unit {
@@ -267,26 +269,49 @@ internal class InternalWindow(shouldHaveDebugContext: Boolean) {
         this.handle = NULL
     }
     internal fun onMove(position: IntPosition): Unit {
-        if (this.isNormal()) {
-            val frameSize: BorderSize = this.getFrameSize()
-            this.setPosition(IntPosition(position.x - frameSize.left, position.y - frameSize.top))
-        }
+        this.pendingPosition = position
     }
     internal fun onResize(size: IntSize): Unit {
-        if (this.isNormal()) { this.setSize(size) }
+        this.pendingSize = size
     }
     internal fun onMinimize(): Unit {
         this.isMinimized = true
     }
     internal fun onUnminimize(): Unit {
         this.isMinimized = false
-        this.setSize(this.savedSize).setPosition(this.savedPosition)
+        this.didUnminimize = true
+        this.pendingPosition = null
+        this.pendingSize = null
     }
     internal fun onMaximize(): Unit {
         this.isMaximized = true
     }
     internal fun onUnmaximize(): Unit {
         this.isMaximized = false
-        this.setSize(this.savedSize).setPosition(this.savedPosition)
+        this.didUnmaximize = true
+        this.pendingPosition = null
+        this.pendingSize = null
+    }
+
+    internal fun afterEvents(): Unit {
+        val position: IntPosition? = this.pendingPosition
+        if (position != null && this.isNormal()) {
+            val frameSize: BorderSize = this.getFrameSize()
+            this.savedPosition = IntPosition(position.x - frameSize.left, position.y - frameSize.top)
+        }
+        this.pendingPosition = null
+
+        val size: IntSize? = this.pendingSize
+        if (size != null && this.isNormal()) { this.savedSize = size }
+        this.pendingSize = null
+
+        if (this.didUnminimize) {
+            this.setSize(this.savedSize).setPosition(this.savedPosition)
+            this.didUnminimize = false
+        }
+        if (this.didUnmaximize) {
+            this.setSize(this.savedSize).setPosition(this.savedPosition)
+            this.didUnmaximize = false
+        }
     }
 }

@@ -15,5 +15,5 @@ enum class Cursor(private val cursor: Int) {
     OMNI_DIRECTIONAL_RESIZE(GLFW_RESIZE_ALL_CURSOR),
     NOT_ALLOWED(GLFW_NOT_ALLOWED_CURSOR);
 
-    internal fun toInt(): Int = this.cursor
+    internal fun toGLFWCursor(): Int = this.cursor
 }

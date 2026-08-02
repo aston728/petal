@@ -2,12 +2,9 @@ package com.aston728.engine.utils
 
 data class Color(val r: Int, val g: Int, val b: Int, val a: Int = 255) {
     init {
-        require(
-            this.r in 0..255 &&
-            this.g in 0..255 &&
-            this.b in 0..255 &&
-            this.a in 0..255
-        ) { "RGBA values must be between 0 and 255, got (${this.r}, ${this.b}, ${this.g}, ${this.a})" }
+        require(this.r in 0..255 && this.g in 0..255 && this.b in 0..255 && this.a in 0..255) {
+            "RGBA values must be between 0 and 255, got (${this.r}, ${this.b}, ${this.g}, ${this.a})"
+        }
     }
 
     companion object {

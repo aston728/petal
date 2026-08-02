@@ -1,5 +1,8 @@
 package com.aston728.engine.core
 
+import com.aston728.engine.renderer.ShaderManager
+import com.aston728.engine.renderer.ShaderProvider
+
 import com.aston728.engine.internals.core.MonitorService
 import com.aston728.engine.internals.core.ClipboardService
 import com.aston728.engine.internals.core.TimeService
@@ -12,7 +15,7 @@ import com.aston728.engine.internals.devices.Keyboard
 class EngineContext internal constructor(
     val mouse: Mouse, val keyboard: Keyboard,
     val monitors: MonitorService, val time: TimeService, val clipboard: ClipboardService,
-    val eventSubscriber: EventSubscriber,
+    val eventSubscriber: EventSubscriber, internal val shaderProvider: ShaderProvider,
     val logger: FrozenLogger, val isDebugOn: Boolean,
 )
 
@@ -23,6 +26,6 @@ private val defaultLogger: Logger = Logger()
 internal val defaultEngineContext: EngineContext = EngineContext(
     MouseController(), KeyboardController(),
     MonitorService(), TimeService(), ClipboardService(),
-    EventManager(),
+    EventManager(), ShaderManager(),
     defaultLogger, isDebugOn = false,
 )

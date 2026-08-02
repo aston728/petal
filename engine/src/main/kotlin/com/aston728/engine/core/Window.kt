@@ -23,16 +23,15 @@ import com.aston728.engine.internals.devices.Cursor
 
 import com.aston728.engine.types.IntPosition
 import com.aston728.engine.types.IntSize
+import com.aston728.engine.types.Handler
 import com.aston728.engine.types.ErrorHandler
 
 class Window internal constructor(
-    private var context: EngineContext,
-    graphicsApi: GraphicsApi, debugMessageCallback: ErrorHandler
-) : NamedObject<Window>() {
-    init { this._name = "Unnamed Window" }
-
+    private var context: EngineContext, sharedHandle: Long?, graphicsApi: GraphicsApi,
+    debugMessageCallback: ErrorHandler
+) : NamedObject<Window>("Unnamed Window") {
     private var initialSize: IntSize = IntSize(500, 500)
-    private val internalWindow: InternalWindow = this.createInternalWindow()
+    private val internalWindow: InternalWindow = this.createInternalWindow(sharedHandle)
     private var state: WindowState = if (this.internalWindow.exists()) { WindowState.ALIVE } else { WindowState.NONEXISTING }
 
     private var defaultCursor: Cursor = Cursor.ARROW
@@ -42,8 +41,8 @@ class Window internal constructor(
 
     private val graphicsContext: GraphicsContext = this.createGraphicsContext(graphicsApi, debugMessageCallback)
 
-    private fun createInternalWindow(): InternalWindow {
-        val window: InternalWindow = InternalWindow(this.context.isDebugOn)
+    private fun createInternalWindow(sharedHandle: Long?): InternalWindow {
+        val window: InternalWindow = InternalWindow(sharedHandle, this.context.isDebugOn)
         if (window.exists()) {
             window
                 .setTitle("Untitled Window")
@@ -67,7 +66,7 @@ class Window internal constructor(
         }
         return block()
     }
-    private inline fun safeSet(attributeName: String, block: () -> Unit): Window {
+    private inline fun safeSet(attributeName: String, block: Handler): Window {
         if (this.state != WindowState.ALIVE) {
             this.context.logger.error("WINDOW", "$this isn't alive, cannot set $attributeName")
         } else {
@@ -75,7 +74,7 @@ class Window internal constructor(
         }
         return this
     }
-    private inline fun safeDo(actionDescription: String, block: () -> Unit): Window {
+    private inline fun safeDo(actionDescription: String, block: Handler): Window {
         if (this.state != WindowState.ALIVE) {
             this.context.logger.error("WINDOW", "$this isn't alive, cannot $actionDescription")
         } else {
@@ -85,7 +84,6 @@ class Window internal constructor(
     }
 
     internal fun getInternalWindow(): InternalWindow = this.internalWindow
-    internal fun getSizeUnsafe(): IntSize = this.internalWindow.getSize()
     internal fun getGraphicsContext(): GraphicsContext = this.graphicsContext
 
     fun getState(): WindowState = this.state
@@ -158,7 +156,7 @@ class Window internal constructor(
     fun setPosition(position: IntPosition, monitorI: Int? = null): Window = this.safeSet("position") {
         val monitorInfo: MonitorInfo? =
             if (monitorI == null) { this.getMonitorInfo() }
-            else { this.context.monitors.getInfoFromIndex(monitorI) }
+            else { this.context.monitors.getInfoAtIndex(monitorI) }
         if (monitorInfo != null) {
             val monitorPosition: IntPosition = monitorInfo.getRect().getTopLeft()
             this.internalWindow.setPosition(monitorPosition + position)
@@ -167,7 +165,7 @@ class Window internal constructor(
     fun setPosition(coordinate: Coordinate, monitorI: Int? = null): Window = this.safeSet("position") {
         val monitorInfo: MonitorInfo? =
             if (monitorI == null) { this.getMonitorInfo() }
-            else { this.context.monitors.getInfoFromIndex(monitorI) }
+            else { this.context.monitors.getInfoAtIndex(monitorI) }
         if (monitorInfo != null) {
             val monitorRect: Rect = monitorInfo.getUsableRect()
             val windowRect: Rect = this.internalWindow.getSavedRect()
@@ -246,11 +244,11 @@ class Window internal constructor(
             )
         }
     }
-    fun setFullscreen(isFullscreen: Boolean, monitorI: Int? = 0): Window = this.safeSet("fullscreen flag") {
+    fun setFullscreen(isFullscreen: Boolean, monitorI: Int? = null): Window = this.safeSet("fullscreen flag") {
         val windowMonitorInfo: MonitorInfo? = this.getMonitorInfo()
         val monitorInfo: MonitorInfo? =
             if (monitorI == null) { windowMonitorInfo }
-            else { this.context.monitors.getInfoFromIndex(monitorI) }
+            else { this.context.monitors.getInfoAtIndex(monitorI) }
         if (this.internalWindow.isFullscreen() != isFullscreen || monitorInfo != windowMonitorInfo) {
             this.internalWindow.setModes(
                 this.internalWindow.isMinimized(), this.internalWindow.isMaximized(), isFullscreen,
@@ -258,7 +256,7 @@ class Window internal constructor(
             )
         }
     }
-    fun toggleFullscreen(monitorI: Int? = 0): Window = this.setFullscreen(!this.internalWindow.isFullscreen(), monitorI)
+    fun toggleFullscreen(monitorI: Int? = null): Window = this.setFullscreen(!this.internalWindow.isFullscreen(), monitorI)
     fun setOpacity(opacity: Float): Window = this.safeSet("opacity") {
         var opacity: Float = opacity
         if (opacity !in 0.0..1.0) {
@@ -298,6 +296,7 @@ class Window internal constructor(
     }
     fun setUI(ui: UI?): Window = this.safeSet("UI") {
         this.ui = ui?.attachContext(this.context)
+        this.ui?.onWindowAttach()
     }
     fun addToEngine(engine: Engine): Window = this.safeDo("add to engine") {
         engine.addWindow(this)
@@ -344,11 +343,12 @@ class Window internal constructor(
         this.ui?.onUnfocus()
     }
 
-    internal fun handleUIDirtyFlags(): Unit {
+    internal fun handleUIDirtyFlags(): Window = apply {
         val rect: Rect = Rect(IntPosition(0, 0), this.internalWindow.getSize())
         this.ui
             ?.handleDirtyAnchors(rect)
             ?.handleDirtyRelationship()
             ?.handleDirtyLayouts(IntSize(rect.width, rect.height))
+            ?.handleDirtyShaders(this.graphicsContext)
     }
 }

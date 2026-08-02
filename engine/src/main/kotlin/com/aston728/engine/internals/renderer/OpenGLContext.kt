@@ -3,7 +3,6 @@ package com.aston728.engine.internals.renderer
 import org.lwjgl.opengl.*
 import org.lwjgl.glfw.GLFW.glfwMakeContextCurrent
 import org.lwjgl.glfw.GLFW.glfwSwapBuffers
-import org.lwjgl.opengl.GL11C.*
 import org.lwjgl.opengl.GL43C.*
 import org.lwjgl.system.MemoryUtil.NULL
 
@@ -12,7 +11,7 @@ import com.aston728.engine.renderer.GraphicsContext
 import com.aston728.engine.types.IntSize
 import com.aston728.engine.types.ErrorHandler
 
-internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debugMessageCallback: ErrorHandler) : GraphicsContext() {
+internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debugMessageCallback: ErrorHandler) : GraphicsContext {
     private val capabilities: GLCapabilities = this.createCapabilities()
     init {
         if (isDebugOn) { this.enableDebugging(debugMessageCallback) }
@@ -104,7 +103,7 @@ internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debug
         val description: String = GLDebugMessageAMDCallback.getMessage(messageLength, message)
         return "Source: $categoryString\nSeverity: $severityString\nMessage: $description"
     }
-    override fun enableDebugging(messageCallback: ErrorHandler): Unit {
+    private fun enableDebugging(messageCallback: ErrorHandler): Unit {
         if ((glGetInteger(GL_CONTEXT_FLAGS) and GL_CONTEXT_FLAG_DEBUG_BIT) == 0) {
             messageCallback("Failed to set a debug message callback, a debug context is not present")
             return
@@ -142,17 +141,19 @@ internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debug
         }
     }
 
+    override fun getHandle(): Long = this.handle
+
     override fun onResize(size: IntSize): Unit {
         glfwMakeContextCurrent(this.handle)
         GL.setCapabilities(this.capabilities)
         glViewport(0, 0, size.width, size.height)
     }
 
-    override fun startDrawing(): Unit {
+    override fun makeCurrent(): Unit {
         glfwMakeContextCurrent(this.handle)
         GL.setCapabilities(this.capabilities)
     }
-    override fun stopDrawing(): Unit {
+    override fun swapBuffers(): Unit {
         glfwSwapBuffers(this.handle)
     }
 }

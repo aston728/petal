@@ -3,9 +3,9 @@ package com.aston728.engine.internals.devices
 import org.lwjgl.glfw.GLFW.*
 
 @JvmInline
-value class Key(val value: Int) {
+value class Key(val code: Int) {
     init {
-        require(this.value in -1..Char.MAX_VALUE.code) { "Invalid key: ${this.value}" }
+        require(this.code in -1..Char.MAX_VALUE.code) { "Invalid key: ${this.code}" }
     }
 
     companion object {
@@ -15,5 +15,5 @@ value class Key(val value: Int) {
         val F11: Key = Key(GLFW_KEY_F11)
     }
 
-    override fun toString(): String = "Key(value=${this.value} character=${this.value.toChar()})"
+    override fun toString(): String = "Key(code=${this.code} character=${this.code.toChar()})"
 }

@@ -1,11 +1,11 @@
 package com.aston728.engine.utils
 
-abstract class NamedObject<T : NamedObject<T>> {
-    protected var _name: String = "Unnamed Object"
+import com.aston728.engine.types.Handler
 
-    @Suppress("unchecked_cast")
-    protected inline fun self(block: () -> Unit): T {
+abstract class NamedObject<T : NamedObject<T>>(protected var _name: String) {
+    protected inline fun self(block: Handler): T {
         block()
+        @Suppress("unchecked_cast")
         return this as T
     }
 

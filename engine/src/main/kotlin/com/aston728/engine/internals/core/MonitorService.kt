@@ -21,6 +21,7 @@ class MonitorService internal constructor() {
         glfwGetError(null) // clear previous error
 
         val name: String = glfwGetMonitorName(handle) ?: "Unknown Monitor"
+
         val x: IntArray = IntArray(1)
         val y: IntArray = IntArray(1)
         glfwGetMonitorPos(handle, x, y)
@@ -53,7 +54,7 @@ class MonitorService internal constructor() {
     }
 
     fun refreshInfo(info: MonitorInfo): MonitorInfo? = this.getInfoFromHandle(info.getHandle())
-    fun getInfoFromIndex(i: Int): MonitorInfo? {
+    fun getInfoAtIndex(i: Int): MonitorInfo? {
         val monitorsHandles: PointerBuffer = glfwGetMonitors() ?: return null
         if (i !in 0 until monitorsHandles.limit()) { return null }
         return this.getInfoFromHandle(monitorsHandles[i])

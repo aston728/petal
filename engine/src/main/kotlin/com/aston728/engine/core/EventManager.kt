@@ -65,6 +65,23 @@ internal class EventManager : EventSubscriber {
             .setOnKeyCallback { _, key, scanCode, action, mods -> this.handleKeyEvent(window, key, scanCode, action, mods) }
             .setOnCharacterCallback { _, char -> this.addEvent(CharacterEvent(window, char)) }
     }
+    internal fun unregisterWindow(window: Window): EventManager = apply {
+        window.getInternalWindow()
+            .setOnCloseRequestCallback {}
+            .setOnMoveCallback { _, _, _ -> }
+            .setOnResizeCallback { _, _, _ -> }
+            .setOnMinimizeChangeCallback { _, _ -> }
+            .setOnMaximizeChangeCallback { _, _ -> }
+            .setOnFocusChangeCallback { _, _ -> }
+
+            .setOnMouseEnterLeaveCallback { _, _ -> }
+            .setOnMouseMoveCallback { _, _, _ -> }
+            .setOnMouseScrollCallback { _, _, _ -> }
+            .setOnMouseButtonCallback { _, _, _, _ -> }
+
+            .setOnKeyCallback { _, _, _, _, _ -> }
+            .setOnCharacterCallback { _, _ -> }
+    }
 
     internal fun compress(): Unit {
         val windowMoveEventMap: MutableMap<Window, WindowMoveEvent> = mutableMapOf()
@@ -90,9 +107,6 @@ internal class EventManager : EventSubscriber {
         this.events.add(event)
     }
 
-    internal fun dispatchEvent(event: Event): EventManager = apply {
-        this.eventMappings[event::class]?.toList()?.forEach { it(event) }
-    }
     override fun <T : Event> subscribe(event: KClass<T>, handler: (T) -> Unit, handle: Handle?): EventManager = apply {
         val handlers: MutableList<EventHandler> = this.eventMappings.getOrPut(event) { mutableListOf() }
         @Suppress("unchecked_cast")
@@ -100,5 +114,8 @@ internal class EventManager : EventSubscriber {
 
         handlers.add(wrapper)
         handle?.setOnRemoveHandler { handlers.remove(wrapper) }
+    }
+    internal fun dispatchEvent(event: Event): EventManager = apply {
+        this.eventMappings[event::class]?.toList()?.forEach { it(event) }
     }
 }

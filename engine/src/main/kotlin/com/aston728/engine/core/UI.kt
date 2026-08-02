@@ -7,6 +7,7 @@ import com.aston728.engine.renderer.Renderer
 import com.aston728.engine.layout.Anchor
 import com.aston728.engine.layout.Rect
 import com.aston728.engine.layout.SizeReference
+import com.aston728.engine.renderer.GraphicsContext
 
 import com.aston728.engine.utils.Color
 import com.aston728.engine.utils.NamedObject
@@ -15,8 +16,8 @@ import com.aston728.engine.types.IntSize
 import com.aston728.engine.types.GenericUIElement
 import com.aston728.engine.types.DrawSequence
 
-class UI : NamedObject<UI>() {
-    init { this._name = "Unnamed UI" }
+class UI : NamedObject<UI>("Unnamed UI") {
+    private var context: EngineContext = defaultEngineContext
 
     private val elements: MutableSet<GenericUIElement> = mutableSetOf()
     private val anchorMappings: MutableMap<GenericUIElement, MutableSet<GenericUIElement>> = mutableMapOf()
@@ -25,8 +26,6 @@ class UI : NamedObject<UI>() {
     private var hoveredElement: GenericUIElement? = null
 
     private var backgroundColor: Color = Color.BLACK
-
-    private var context: EngineContext = defaultEngineContext
 
     fun getAnchoredTo(element: GenericUIElement): List<GenericUIElement> = this.anchorMappings.getOrDefault(element, emptySet()).toList()
     fun getChildrenOf(element: GenericUIElement): List<GenericUIElement> = this.parentMappings.getOrDefault(element, emptySet()).toList()
@@ -37,11 +36,10 @@ class UI : NamedObject<UI>() {
     }
 
     internal fun attachContext(context: EngineContext): UI = apply {
-        this.context = context
-        this.elements.forEach { it.attachContext(this.context) }
-    }
-    fun removeElement(element: GenericUIElement): UI = apply {
-        // TODO remove elements and handle the consequences
+        if (this.context != context) {
+            this.context = context
+            this.elements.forEach { it.attachContext(this.context) }
+        }
     }
     fun addElement(element: GenericUIElement): UI = apply {
         val didAdd: Boolean = this.elements.add(element)
@@ -49,14 +47,17 @@ class UI : NamedObject<UI>() {
             this.context.logger.warn("UI", "$this already had the element: $element")
         }
         element
-            .addDirtyFlag(DirtyFlags.ANCHOR + DirtyFlags.POSITION + DirtyFlags.SIZE)
+            .addDirtyFlag(DirtyFlags.ANCHOR + DirtyFlags.POSITION + DirtyFlags.SIZE + DirtyFlags.SHADER)
             .attachContext(this.context)
+    }
+    fun removeElement(element: GenericUIElement): UI = apply {
+        // TODO: remove elements and handle the consequences
     }
     fun addToWindow(window: Window): UI = apply {
         window.setUI(this)
     }
     fun setStructure(vararg elements: GenericUIElement): UI = apply {
-        elements.forEach { this.removeElement(it) }
+        this.elements.toList().forEach { this.removeElement(it) }
         elements.forEach { this.addElement(it) }
     }
 
@@ -174,6 +175,12 @@ class UI : NamedObject<UI>() {
             elements.reposition()
         }
     }
+    internal fun handleDirtyShaders(graphicsContext: GraphicsContext): UI = apply {
+        graphicsContext.makeCurrent()
+        this.elements.forEach {
+            if (DirtyFlags.SHADER in it.getDirtyFlags()) { it.commitShaderChange(graphicsContext.getHandle()) }
+        }
+    }
 
     internal fun refreshHoveredElement(): Unit {
         this.hoveredElement = this.elements
@@ -193,6 +200,7 @@ class UI : NamedObject<UI>() {
 
         renderer.clearWith(this.backgroundColor)
         renderer.draw(drawSequence)
+        elements.forEach { it.draw() } // TODO
     }
 
     internal fun onFocus(): Unit {
@@ -203,5 +211,8 @@ class UI : NamedObject<UI>() {
     }
     internal fun onResize(): Unit {
         this.elements.forEach { it.addDirtyFlag(DirtyFlags.SIZE) }
+    }
+    internal fun onWindowAttach(): Unit {
+        this.elements.forEach { it.addDirtyFlag(DirtyFlags.SHADER) }
     }
 }

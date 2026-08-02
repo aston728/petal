@@ -7,12 +7,12 @@ import com.aston728.engine.types.ErrorHandler
 
 class ClipboardService internal constructor(
     private val windowProvider: () -> Long? = { null },
-    private val onFailure: ErrorHandler = { message -> System.err.println("[CLIPBOARD] $message") }
+    private val errorCallback: ErrorHandler = { message -> System.err.println("[CLIPBOARD] $message") }
 ) {
     fun getText(): String? {
         val windowHandle: Long? = this.windowProvider()
         if (windowHandle == null) {
-            this.onFailure("Cannot get text, no window available")
+            this.errorCallback("Cannot get text, no window available")
             return null
         }
         return glfwGetClipboardString(windowHandle)
@@ -20,7 +20,7 @@ class ClipboardService internal constructor(
     fun setText(text: String): Unit {
         val windowHandle: Long? = this.windowProvider()
         if (windowHandle == null) {
-            this.onFailure("Cannot set text, no window available")
+            this.errorCallback("Cannot set text, no window available")
         } else {
             glfwSetClipboardString(windowHandle, text)
         }

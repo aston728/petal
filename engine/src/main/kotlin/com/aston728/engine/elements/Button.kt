@@ -4,10 +4,16 @@ import kotlin.math.roundToInt
 
 import com.aston728.engine.utils.Handle
 
+import com.aston728.engine.renderer.ShaderData
+import com.aston728.engine.renderer.ShaderSpec
+
+import com.aston728.engine.internals.renderer.GLSLAttributeType
+
 import com.aston728.engine.internals.devices.MouseButton
 import com.aston728.engine.internals.devices.Cursor
 
 import com.aston728.engine.internals.utils.ImageUtils
+import com.aston728.engine.renderer.ShaderVertexAttributeHandle
 
 import com.aston728.engine.types.IntSize
 import com.aston728.engine.types.SizePercentage
@@ -16,15 +22,22 @@ import com.aston728.engine.types.Imgs
 import com.aston728.engine.types.DrawSequence
 import com.aston728.engine.types.GenericUIElement
 import com.aston728.engine.types.Handler
+import com.aston728.engine.types.Vec2
 
-class Button : UIElement<Button>() {
+class Button : UIElement<Button>("Unnamed Button") {
     companion object {
         val DEFAULT_IMG_NORMAL: Img = 0
         val DEFAULT_IMG_HOVERED: Img = 0
         val DEFAULT_IMG_DISABLED: Img = 0
-    }
 
-    init { this._name = "Unnamed Button" }
+        private val SHADER_POSITION: ShaderVertexAttributeHandle<Vec2> = ShaderVertexAttributeHandle.vec2()
+        private val SHADER_SPEC: ShaderSpec = ShaderSpec()
+            .setName("Button Shader")
+            .addVertexAttribute("iPosition", this.SHADER_POSITION)
+            .addOutputAttribute("oColor", GLSLAttributeType.Vec4)
+            .setVertexShaderSource("gl_Position = vec4(iPosition, 0.0, 1.0);")
+            .setFragmentShaderSource("oColor = vec4(1.0, 1.0, 1.0, 1.0);")
+    }
 
     private var sizePercentage: SizePercentage = SizePercentage(10.0, 5.0)
 
@@ -41,6 +54,9 @@ class Button : UIElement<Button>() {
     fun getSizePercentage(): SizePercentage = this.sizePercentage
     fun isActive(): Boolean = this.isActive
 
+    override fun setShader(vararg specs: ShaderSpec, data: Array<ShaderData>): Button = apply {
+        super.setShader(Button.SHADER_SPEC, *specs, data = data)
+    }
     fun setSizePercentage(percentage: SizePercentage): Button = apply {
         this.sizePercentage = percentage
         this.addDirtyFlag(DirtyFlags.SIZE)
@@ -60,6 +76,12 @@ class Button : UIElement<Button>() {
     fun addOnClickHandler(handler: Handler, handle: Handle? = null): Button = apply {
         this.onClickHandlers.add(handler)
         handle?.setOnRemoveHandler { this.onClickHandlers.remove(handler) }
+    }
+
+    override fun commitShaderChange(contextHandle: Long) {
+        super.commitShaderChange(contextHandle)
+        this._shaderInstanceHandle
+            .setVertexAttribute(Button.SHADER_POSITION, arrayOf(Vec2(-1.0f, -1.0f), Vec2(-0.5f, -1.0f), Vec2(-1.0f, -0.5f), Vec2(-0.5f, -0.5f)))
     }
 
     override fun isHovered(): Boolean = this._rect.isCollidingWith(this._context.mouse.getPosition())

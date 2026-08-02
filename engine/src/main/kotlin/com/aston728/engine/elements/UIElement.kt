@@ -12,15 +12,21 @@ import com.aston728.engine.layout.Coordinate
 
 import com.aston728.engine.utils.NamedObject
 
+import com.aston728.engine.renderer.ShaderData
+import com.aston728.engine.renderer.ShaderSpec
+
 import com.aston728.engine.internals.devices.Cursor
+import com.aston728.engine.renderer.Shader
+import com.aston728.engine.renderer.ShaderInstanceHandle
 
 import com.aston728.engine.types.IntSize
 import com.aston728.engine.types.IntOffset
 import com.aston728.engine.types.DrawSequence
 import com.aston728.engine.types.GenericUIElement
 
-abstract class UIElement<T : UIElement<T>> : NamedObject<T>() {
-    init { this._name = "Unnamed Element" }
+sealed class UIElement<T : UIElement<T>> (name: String) : NamedObject<T>(name) {
+    protected var _context: EngineContext = defaultEngineContext
+        private set
 
     private val anchoredPosition: AnchoredPosition = AnchoredPosition(
         Anchor.toWindow(Coordinate.TOP_LEFT),
@@ -29,27 +35,34 @@ abstract class UIElement<T : UIElement<T>> : NamedObject<T>() {
     protected val _rect: Rect = Rect()
     private var layer: Double = 0.0
 
+    private var shaderSpec: ShaderSpec = ShaderSpec()
+    private var shaderData: Array<ShaderData> = emptyArray()
+    protected var _shaderInstanceHandle: ShaderInstanceHandle = this._context.shaderProvider.acquirePlaceholder()
+        private set
+
     private var parent: GenericUIElement? = null
     private var desiredParent: GenericUIElement? = this.parent
 
     private var isVisible: Boolean = true
     private var sizeReference: SizeReference = SizeReference.PARENT
-
-    private var dirtyFlags: DirtyFlags = DirtyFlags.empty()
-
-    protected var _context: EngineContext = defaultEngineContext
-        private set
+    private var dirtyFlags: DirtyFlags = DirtyFlags.none()
 
     internal fun getRectUnsafe(): Rect = this._rect
     internal fun getPositionUnsafe(): AnchoredPosition = this.anchoredPosition
     internal fun getDesiredParent(): GenericUIElement? = this.desiredParent
+    internal fun getDirtyFlags(): DirtyFlags = this.dirtyFlags
 
     fun getPosition(): AnchoredPosition = this.anchoredPosition.copy()
     fun getLayer(): Double = this.layer
+    fun getShader(): Shader = this._shaderInstanceHandle.shader
+    fun getShaderInstance(): ShaderInstanceHandle = this._shaderInstanceHandle
     fun getParent(): GenericUIElement? = this.parent
-    fun getDirtyFlags(): DirtyFlags = this.dirtyFlags
     fun isVisible(): Boolean = this.isVisible
     fun getSizeReference(): SizeReference = this.sizeReference
+
+    internal fun addDirtyFlag(flag: DirtyFlags): T = this.self {
+        this.dirtyFlags += flag
+    }
 
     fun setPosition(anchor: Anchor, coordinate: Coordinate, offset: IntOffset): T = this.self {
         this.anchoredPosition.setAnchor(anchor).setCoordinate(coordinate).setOffset(offset)
@@ -65,6 +78,11 @@ abstract class UIElement<T : UIElement<T>> : NamedObject<T>() {
     fun setLayer(layer: Double): T = this.self {
         this.layer = layer
     }
+    open fun setShader(vararg specs: ShaderSpec, data: Array<ShaderData> = emptyArray()): T = this.self {
+        this.shaderSpec = ShaderSpec.merge(*specs)
+        this.shaderData = data
+        this.dirtyFlags += DirtyFlags.SHADER
+    }
     fun setParent(parent: GenericUIElement?): T = this.self {
         this.desiredParent = parent
         this.dirtyFlags += DirtyFlags.RELATIONSHIP
@@ -76,9 +94,6 @@ abstract class UIElement<T : UIElement<T>> : NamedObject<T>() {
         this.isVisible = isVisible
     }
     fun toggleVisibility(): T = this.setVisible(!this.isVisible)
-    fun addDirtyFlag(flag: DirtyFlags): T = this.self {
-        this.dirtyFlags += flag
-    }
 
     internal fun attachContext(context: EngineContext): T = this.self {
         this._context = context
@@ -112,6 +127,16 @@ abstract class UIElement<T : UIElement<T>> : NamedObject<T>() {
     internal open fun resize(fullSize: IntSize): Unit {
         this.dirtyFlags -= DirtyFlags.SIZE
     }
+    internal open fun commitShaderChange(contextHandle: Long): Unit {
+        this._context.shaderProvider.release(this._shaderInstanceHandle)
+        this._shaderInstanceHandle = this._context.shaderProvider.acquire(contextHandle, this.shaderSpec)
+        this.shaderData.forEach { it.applyTo(this._shaderInstanceHandle) }
+        this.dirtyFlags -= DirtyFlags.SHADER
+    }
     internal open fun getDrawSequence(hoveredElement: GenericUIElement?): DrawSequence = emptyList()
     internal open fun update(hoveredElement: GenericUIElement?): Unit {}
+
+    internal fun draw(): Unit {  // TODO
+        this._shaderInstanceHandle.draw()
+    }
 }

@@ -14,7 +14,6 @@ class MonitorInfo internal constructor(
     fun getUsableRect(): Rect = this.usableRect.copy()
     fun getRefreshRate(): Int = this.refreshRate
 
-    override fun toString(): String = (
+    override fun toString(): String =
         "MonitorInfo(name='${this.name}', rect=${this.rect}, usableRect=${this.usableRect}, refreshRate=${this.refreshRate})"
-    )
 }
