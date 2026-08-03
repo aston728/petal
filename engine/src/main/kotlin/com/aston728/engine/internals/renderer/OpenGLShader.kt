@@ -5,7 +5,6 @@ import org.lwjgl.opengl.GL30C.*
 import com.aston728.engine.renderer.Shader
 import com.aston728.engine.renderer.ShaderInstanceAttributeHandle
 import com.aston728.engine.renderer.ShaderInstanceAttributeInfo
-import com.aston728.engine.renderer.ShaderInstanceHandle
 import com.aston728.engine.renderer.ShaderUniformHandle
 import com.aston728.engine.renderer.ShaderVertexAttributeInfo
 import com.aston728.engine.renderer.ShaderUniformInfo
@@ -15,18 +14,18 @@ import com.aston728.engine.types.Handler
 import com.aston728.engine.types.ErrorHandler
 import kotlin.collections.Map
 
-private class AttributeData(val name: String, val location: Int)
+private class ShaderAttributeData(val name: String, val location: Int)
 
 internal class OpenGLShader internal constructor(
     name: String,
-    vertexAttributesInfo: List<ShaderVertexAttributeInfo<*>>, private val vertexDataStrideSize: Int, private val verticesPerInstance: Int,
-    instanceAttributesInfo: List<ShaderInstanceAttributeInfo<*>>, private val instanceDataStrideSize: Int,
+    vertexAttributesInfo: List<ShaderVertexAttributeBinding>, private val vertexDataStrideSize: Int, private val verticesPerInstance: Int,
+    instanceAttributesInfo: List<ShaderInstanceAttributeBinding>, private val instanceDataStrideSize: Int,
     uniformsInfo: List<ShaderUniformInfo<*>>,
     vertexSource: String, fragmentSource: String,
     private val errorCallback: ErrorHandler,
 ) : Shader(name) {
-    companion object {
-        const val INVALID_PROGRAM: Int = -1
+    private companion object {
+        private const val INVALID_PROGRAM: Int = -1
     }
 
     private var vertexData: FloatArray = floatArrayOf()
@@ -41,17 +40,15 @@ internal class OpenGLShader internal constructor(
     private val ebo: Int = glGenBuffers()
     private var program: Int = this.createProgram(vertexSource, fragmentSource)
 
-    private val vertexAttributeMappings: Map<ShaderVertexAttributeHandle<*>, AttributeData> =
+    private val vertexAttributeMappings: Map<ShaderVertexAttributeHandle<*>, ShaderAttributeData> = vertexAttributesInfo.associate {
+        it.handle to ShaderAttributeData(it.name, it.bufferLocation)
+    }
+    private val instanceAttributeMappings: Map<ShaderInstanceAttributeHandle<*>, ShaderAttributeData> = instanceAttributesInfo.associate {
+        it.handle to ShaderAttributeData(it.name, it.bufferLocation)
+    }
+    private val uniformMappings: Map<ShaderUniformHandle<*>, ShaderAttributeData> =
         if (this.isValid()) {
-            vertexAttributesInfo.associate { it.handle to AttributeData(it.name, it.bufferLocation) }
-        } else { emptyMap() }
-    private val instanceAttributeMappings: Map<ShaderInstanceAttributeHandle<*>, AttributeData> =
-        if (this.isValid()) {
-            instanceAttributesInfo.associate { it.handle to AttributeData(it.name, it.bufferLocation) }
-        } else { emptyMap() }
-    private val uniformMappings: Map<ShaderUniformHandle<*>, AttributeData> =
-        if (this.isValid()) {
-            uniformsInfo.associate { it.handle to AttributeData(it.name, glGetUniformLocation(this.program, it.name)) }
+            uniformsInfo.associate { it.handle to ShaderAttributeData(it.name, glGetUniformLocation(this.program, it.name)) }
         } else { emptyMap() }
 
     private fun createProgram(vertexSource: String, fragmentSource: String): Int {
@@ -138,9 +135,9 @@ internal class OpenGLShader internal constructor(
         glBufferData(GL_ARRAY_BUFFER, this.instanceData, GL_STATIC_DRAW)
     }
     override fun <T> setVertexAttribute(handle: ShaderVertexAttributeHandle<T>, instanceI: Int, values: Array<T>) {
-        val data: AttributeData? = this.vertexAttributeMappings[handle]
+        val data: ShaderAttributeData? = this.vertexAttributeMappings[handle]
         if (data == null) {
-            this.errorCallback("Cannot set vertex attribute, this handle doesn't belong to $this")
+            this.errorCallback("Cannot set vertex attribute, this handle isn't registered to $this")
         } else if (!this.isValid()) {
             this.errorCallback("Cannot set vertex attribute '${data.name}', $this is invalid")
         } else if (values.size != this.verticesPerInstance) {
@@ -155,9 +152,9 @@ internal class OpenGLShader internal constructor(
         }
     }
     override fun <T> setInstanceAttribute(handle: ShaderInstanceAttributeHandle<T>, instanceI: Int, value: T) {
-        val data: AttributeData? = this.instanceAttributeMappings[handle]
+        val data: ShaderAttributeData? = this.instanceAttributeMappings[handle]
         if (data == null) {
-            this.errorCallback("Cannot set instance attribute, this handle doesn't belong to $this")
+            this.errorCallback("Cannot set instance attribute, this handle isn't registered to $this")
         } else if (!this.isValid()) {
             this.errorCallback("Cannot set instance attribute '${data.name}', $this is invalid")
         } else {
@@ -167,9 +164,9 @@ internal class OpenGLShader internal constructor(
         }
     }
     override fun <T> setUniform(handle: ShaderUniformHandle<T>, value: T) {
-        val data: AttributeData? = this.uniformMappings[handle]
+        val data: ShaderAttributeData? = this.uniformMappings[handle]
         if (data == null) {
-            this.errorCallback("Cannot set uniform, this handle doesn't belong to $this")
+            this.errorCallback("Cannot set uniform, this handle isn't registered to $this")
         } else if (!this.isValid()) {
             this.errorCallback("Cannot set uniform '${data.name}', $this is invalid")
         } else {
@@ -201,12 +198,12 @@ internal class OpenGLShader internal constructor(
 
         if (this.isVertexDataDirty) {
             glBindBuffer(GL_ARRAY_BUFFER, this.vertexBuffer)
-            glBufferSubData(GL_ARRAY_BUFFER, 0L, this.vertexData)
+            glBufferSubData(GL_ARRAY_BUFFER, 0, this.vertexData)
             this.isVertexDataDirty = false
         }
         if (this.isInstanceDataDirty) {
             glBindBuffer(GL_ARRAY_BUFFER, this.instanceBuffer)
-            glBufferSubData(GL_ARRAY_BUFFER, 0L, this.instanceData)
+            glBufferSubData(GL_ARRAY_BUFFER, 0, this.instanceData)
             this.isInstanceDataDirty = false
         }
         if (!this.uniformUpdatesQueue.isEmpty()) {

@@ -12,7 +12,7 @@ enum class MouseButton(private val button: Int) {
     BUTTON7(GLFW_MOUSE_BUTTON_7),
     BUTTON8(GLFW_MOUSE_BUTTON_8);
 
-    companion object {
+    internal companion object {
         internal fun fromInt(button: Int): MouseButton =
             entries.find { it.button == button } ?:
             throw IllegalArgumentException("Invalid mouse button: $button")

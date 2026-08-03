@@ -17,7 +17,7 @@ import com.aston728.engine.types.IntPosition
 import com.aston728.engine.types.IntSize
 
 class MonitorService internal constructor() {
-    private fun getInfoFromHandle(handle: Long): MonitorInfo? {
+    internal fun getInfoFromHandle(handle: Long): MonitorInfo? {
         glfwGetError(null) // clear previous error
 
         val name: String = glfwGetMonitorName(handle) ?: "Unknown Monitor"
@@ -48,9 +48,7 @@ class MonitorService internal constructor() {
     fun getPrimaryMonitorInfo(): MonitorInfo? = this.getInfoFromHandle(glfwGetPrimaryMonitor())
     fun listInfo(): List<MonitorInfo?> {
         val monitorsHandles: PointerBuffer = glfwGetMonitors() ?: return emptyList()
-        return List(monitorsHandles.remaining()) {
-            this.getInfoFromHandle(monitorsHandles.get())
-        }
+        return List(monitorsHandles.remaining()) { this.getInfoFromHandle(monitorsHandles.get()) }
     }
 
     fun refreshInfo(info: MonitorInfo): MonitorInfo? = this.getInfoFromHandle(info.getHandle())

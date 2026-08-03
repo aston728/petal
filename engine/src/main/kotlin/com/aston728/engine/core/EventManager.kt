@@ -64,6 +64,8 @@ internal class EventManager : EventSubscriber {
 
             .setOnKeyCallback { _, key, scanCode, action, mods -> this.handleKeyEvent(window, key, scanCode, action, mods) }
             .setOnCharacterCallback { _, char -> this.addEvent(CharacterEvent(window, char)) }
+
+            .setOnDropCallback { _, numFiles, files -> this.addEvent(FileDropEvent(window, numFiles, files)) }
     }
     internal fun unregisterWindow(window: Window): EventManager = apply {
         window.getInternalWindow()
@@ -81,6 +83,8 @@ internal class EventManager : EventSubscriber {
 
             .setOnKeyCallback { _, _, _, _, _ -> }
             .setOnCharacterCallback { _, _ -> }
+
+            .setOnDropCallback { _, _, _ -> }
     }
 
     internal fun compress(): Unit {

@@ -108,6 +108,7 @@ class Window internal constructor(
     fun isResizable(): Boolean? = this.safeGet("resizable flag") { this.internalWindow.isResizable() }
     fun isBordered(): Boolean? = this.safeGet("bordered flag") { this.internalWindow.isBordered() }
     fun isAlwaysOnTop(): Boolean? = this.safeGet("always on top flag") { this.internalWindow.isAlwaysOnTop() }
+    fun isUtility(): Boolean? = this.safeGet("utility flag") { this.internalWindow.isUtility() }
     fun getMonitorInfo(): MonitorInfo? = this.safeGet("monitor info") {
         val monitorsInfo: List<MonitorInfo> = this.context.monitors.listInfo().filterNotNull()
         var windowMonitorInfo: MonitorInfo? = null
@@ -277,13 +278,16 @@ class Window internal constructor(
     fun requestAttention(): Window = this.safeSet("request attention flag") {
         this.internalWindow.requestAttention()
     }
+    fun setUtility(isUtility: Boolean): Window = this.safeSet("utility flag") {
+        this.internalWindow.setUtility(isUtility)
+    }
     fun setDefaultCursor(cursor: Cursor): Window = this.safeSet("default cursor") {
         this.defaultCursor = cursor
     }
     fun setTopLevelCursor(cursor: Cursor?): Window = this.safeSet("top level cursor") {
         this.topLevelCursor = cursor
     }
-    fun <T : Event> addEventHandler(event: KClass<T>, handler: (T) -> Unit, handle: Handle? = null): Window = this.safeDo("add event handler") {
+    fun <T : WindowEvent> addEventHandler(event: KClass<T>, handler: (T) -> Unit, handle: Handle? = null): Window = this.safeDo("add event handler") {
         val wrapper: (T) -> Unit = { event -> if (event.window == this) { handler(event) } }
         this.context.eventSubscriber.subscribe(event, wrapper, handle)
     }

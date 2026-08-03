@@ -1,17 +1,19 @@
 package com.aston728.engine.internals.core
 
-import org.lwjgl.glfw.GLFW.*
-import org.lwjgl.system.MemoryUtil.NULL
-
-import com.aston728.engine.layout.Rect
-import com.aston728.engine.layout.BorderSize
-
 import com.aston728.engine.internals.devices.Cursor
-
+import com.aston728.engine.layout.BorderSize
+import com.aston728.engine.layout.Rect
 import com.aston728.engine.types.IntPosition
 import com.aston728.engine.types.IntSize
+import org.lwjgl.glfw.GLFW.*
+import org.lwjgl.glfw.GLFWDropCallback
+import org.lwjgl.glfw.GLFWNativeWin32
+import org.lwjgl.system.MemoryUtil.NULL
+import org.lwjgl.system.windows.User32
+
 
 internal class InternalWindow(sharedHandle: Long?, shouldHaveDebugContext: Boolean) {
+    // TODO: how to content scale
     private var handle: Long = this.create(sharedHandle, shouldHaveDebugContext)
 
     private var savedPosition: IntPosition = if (this.exists()) { this.getPosition() } else { IntPosition() }
@@ -101,6 +103,17 @@ internal class InternalWindow(sharedHandle: Long?, shouldHaveDebugContext: Boole
     internal fun isAlwaysOnTop(): Boolean = glfwGetWindowAttrib(this.handle, GLFW_FLOATING) != 0
     internal fun getCursor(): Cursor = this.cursor
 
+    private fun isUtilityWin32(): Boolean {
+        val win32Handle: Long = GLFWNativeWin32.glfwGetWin32Window(this.handle)
+        val exStyle: Long = User32.GetWindowLongPtr(win32Handle, User32.GWL_EXSTYLE)
+        return (exStyle and User32.WS_EX_TOOLWINDOW.toLong()) != 0L
+    }
+    internal fun isUtility(): Boolean {
+        val platform: Int = glfwGetPlatform()
+        if (platform == GLFW_PLATFORM_WIN32) { return this.isUtilityWin32() }
+        return false
+    }
+
     internal fun show(): InternalWindow = apply {
         this.isVisible = true
         glfwShowWindow(this.handle)
@@ -185,6 +198,22 @@ internal class InternalWindow(sharedHandle: Long?, shouldHaveDebugContext: Boole
         this.glfwCursor = glfwCreateStandardCursor(this.cursor.toGLFWCursor())
         glfwSetCursor(this.handle, this.glfwCursor)
     }
+
+    private fun setUtilityWin32(isUtility: Boolean) {
+        val win32Handle: Long = GLFWNativeWin32.glfwGetWin32Window(this.handle)
+
+        var exStyle: Long = User32.GetWindowLongPtr(win32Handle, User32.GWL_EXSTYLE)
+
+        exStyle =
+            if (isUtility) { exStyle or User32.WS_EX_TOOLWINDOW.toLong() and User32.WS_EX_APPWINDOW.inv().toLong() }
+            else { exStyle and User32.WS_EX_TOOLWINDOW.inv().toLong() }
+        User32.SetWindowLongPtr(null, win32Handle, User32.GWL_EXSTYLE, exStyle)
+    }
+    internal fun setUtility(isUtility: Boolean): InternalWindow = apply {
+        val platform = glfwGetPlatform()
+        if (platform == GLFW_PLATFORM_WIN32) { this.setUtilityWin32(isUtility) }
+    }
+
     internal fun setOnCloseRequestCallback(callback: (Long) -> Unit): InternalWindow = apply {
         glfwSetWindowCloseCallback(this.handle, callback)
     }
@@ -221,10 +250,16 @@ internal class InternalWindow(sharedHandle: Long?, shouldHaveDebugContext: Boole
     internal fun setOnCharacterCallback(callback: (Long, Int) -> Unit): InternalWindow = apply {
         glfwSetCharCallback(this.handle, callback)
     }
+    internal fun setOnDropCallback(callback: (Long, Int, List<String>) -> Unit): InternalWindow = apply {
+        glfwSetDropCallback(this.handle) { window, numFiles, files ->
+            val fileNames: List<String> = List(numFiles) { i -> GLFWDropCallback.getName(files, i) }
+            callback(window, numFiles, fileNames)
+        }
+    }
 
     internal fun setModes(
         isMinimized: Boolean, isMaximized: Boolean, isFullscreen: Boolean,
-        monitorInfo: MonitorInfo?
+        monitorInfo: MonitorInfo?,
     ): Unit {
         // Reset states and apply new ones
 

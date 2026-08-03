@@ -3,6 +3,7 @@ package com.aston728.app
 import com.aston728.engine.core.Engine
 import com.aston728.engine.core.EngineConfig
 import com.aston728.engine.core.EngineMode
+import com.aston728.engine.core.FileDropEvent
 import com.aston728.engine.core.Window
 import com.aston728.engine.core.UI
 import com.aston728.engine.elements.Button
@@ -52,17 +53,18 @@ fun main(): Unit {
             Anchor.toWindow(Coordinate.CENTER),
             Coordinate.CENTER, IntOffset(0, 0)
         )
-        .setShader(testShader1, data = arrayOf(
+        .setShader(testShader1, data = listOf(
             ShaderVertexData(shaderPosition, arrayOf(Vec2(-1.0f, -1.0f), Vec2(-0.5f, -1.0f), Vec2(-1.0f, -0.5f), Vec2(-0.5f, -0.5f)))
         ))
         .setSizePercentage(SizePercentage(10.0, 10.0))
+        .addOnClickHandler({ testWindow1.setUtility(!testWindow1.isUtility()!!) })
     val testButton2: Button = Button()
         .setName("Test Button 2")
         .setPosition(
             Anchor.toWindow(Coordinate.TOP_LEFT),
             Coordinate.TOP_LEFT, IntOffset(0, 0)
         )
-        .setShader(testShader1, data = arrayOf(
+        .setShader(testShader1, data = listOf(
             ShaderVertexData(shaderPosition, arrayOf(Vec2(0.0f, 0.5f), Vec2(0.5f, 0.5f), Vec2(0.0f, 0.0f), Vec2(0.5f, 0.0f)))
         ))
         .setSizePercentage(SizePercentage(10.0, 10.0))

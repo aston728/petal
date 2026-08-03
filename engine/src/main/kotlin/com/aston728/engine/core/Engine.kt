@@ -52,7 +52,10 @@ class Engine private constructor(config: EngineConfig) {
     private val mouse: MouseController = MouseController()
     private val keyboard: KeyboardController = KeyboardController()
     private val eventManager: EventManager = EventManager()
-    private val shaderManager: ShaderManager = ShaderManager(errorCallback = { message -> this.context.logger.error("SHADER", message) })
+    private val shaderManager: ShaderManager = ShaderManager(
+        this.graphicsApi,
+        errorCallback = { message -> this.context.logger.error("SHADER", message) }
+    )
     private val context: EngineContext = this.createContext()
 
     private val renderer: Renderer = when (this.graphicsApi) {
@@ -62,6 +65,9 @@ class Engine private constructor(config: EngineConfig) {
     }
 
     init {
+        this.runtime
+            .setMonitorEventCallback(this.context.monitors) { info, isConnected -> this.eventManager.addEvent(MonitorEvent(info, isConnected))}
+
         this.context.eventSubscriber.subscribe(KeyPressedEvent::class, { event -> when(event.key) {
             this.stopKey -> this.stop()
             this.resetKey -> this.focusedWindow?.reset()
@@ -219,6 +225,8 @@ class Engine private constructor(config: EngineConfig) {
     }
     internal fun handleEvent(event: Event): Unit {
         when (event) {
+            is MonitorEvent -> {}
+
             is WindowCloseRequestEvent -> { event.window.onCloseRequest() }
             is WindowCloseEvent -> { event.window.onClose() }
             is WindowMoveEvent -> event.window.onMove(event.position)
@@ -246,6 +254,8 @@ class Engine private constructor(config: EngineConfig) {
             is KeyPressedEvent -> this.keyboard.onPress(event.key)
             is KeyReleasedEvent -> this.keyboard.onRelease(event.key)
             is CharacterEvent -> {}
+
+            is FileDropEvent -> {}
         }
     }
     internal fun handleEvents(): Unit {

@@ -7,7 +7,7 @@ enum class DeviceAction(private val action: Int) {
     RELEASE(GLFW_RELEASE),
     REPEAT(GLFW_REPEAT);
 
-    companion object {
+    internal companion object {
         internal fun fromInt(action: Int): DeviceAction =
             entries.find { it.action == action } ?:
             throw IllegalArgumentException("Invalid device action: $action")

@@ -16,8 +16,10 @@ import com.aston728.engine.renderer.ShaderData
 import com.aston728.engine.renderer.ShaderSpec
 
 import com.aston728.engine.internals.devices.Cursor
+import com.aston728.engine.renderer.BlankShader
 import com.aston728.engine.renderer.Shader
 import com.aston728.engine.renderer.ShaderInstanceHandle
+import com.aston728.engine.renderer.ShaderVertexData
 
 import com.aston728.engine.types.IntSize
 import com.aston728.engine.types.IntOffset
@@ -36,7 +38,7 @@ sealed class UIElement<T : UIElement<T>> (name: String) : NamedObject<T>(name) {
     private var layer: Double = 0.0
 
     private var shaderSpec: ShaderSpec = ShaderSpec()
-    private var shaderData: Array<ShaderData> = emptyArray()
+    private var shaderData: List<ShaderData> = emptyList()
     protected var _shaderInstanceHandle: ShaderInstanceHandle = this._context.shaderProvider.acquirePlaceholder()
         private set
 
@@ -78,10 +80,13 @@ sealed class UIElement<T : UIElement<T>> (name: String) : NamedObject<T>(name) {
     fun setLayer(layer: Double): T = this.self {
         this.layer = layer
     }
-    open fun setShader(vararg specs: ShaderSpec, data: Array<ShaderData> = emptyArray()): T = this.self {
-        this.shaderSpec = ShaderSpec.merge(*specs)
+    open fun setShader(vararg specs: ShaderSpec, data: List<ShaderData> = emptyList()): T = this.self {
+        this.shaderSpec = this._context.shaderProvider.specGetOrMerge(*specs)
         this.shaderData = data
         this.dirtyFlags += DirtyFlags.SHADER
+    }
+    fun setToDefaultShader(): T = this.self {
+        this.setShader(ShaderSpec())
     }
     fun setParent(parent: GenericUIElement?): T = this.self {
         this.desiredParent = parent
@@ -128,9 +133,18 @@ sealed class UIElement<T : UIElement<T>> (name: String) : NamedObject<T>(name) {
         this.dirtyFlags -= DirtyFlags.SIZE
     }
     internal open fun commitShaderChange(contextHandle: Long): Unit {
-        this._context.shaderProvider.release(this._shaderInstanceHandle)
-        this._shaderInstanceHandle = this._context.shaderProvider.acquire(contextHandle, this.shaderSpec)
-        this.shaderData.forEach { it.applyTo(this._shaderInstanceHandle) }
+        var instanceHandle: ShaderInstanceHandle? = this._context.shaderProvider.acquire(contextHandle, this.shaderSpec)
+        if (instanceHandle == null && this._shaderInstanceHandle.shader is BlankShader) {
+            this.setToDefaultShader()
+            instanceHandle = this._context.shaderProvider.acquire(contextHandle, this.shaderSpec)
+            this.shaderData = emptyList()
+        }
+
+        if (instanceHandle != null) {
+            this._context.shaderProvider.release(this._shaderInstanceHandle)
+            this._shaderInstanceHandle = instanceHandle
+            this.shaderData.forEach { it.applyTo(this._shaderInstanceHandle) }
+        }
         this.dirtyFlags -= DirtyFlags.SHADER
     }
     internal open fun getDrawSequence(hoveredElement: GenericUIElement?): DrawSequence = emptyList()

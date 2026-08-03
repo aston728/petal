@@ -49,10 +49,9 @@ private object ShaderInputAttributeDescriptors {
     }
 }
 
-sealed class ShaderInputAttributeHandle<T>(internal val descriptor: ShaderInputAttributeDescriptor<T>, internal val isNormalized: Boolean)
 class ShaderVertexAttributeHandle<T> private constructor(
-    descriptor: ShaderInputAttributeDescriptor<T>, isNormalized: Boolean = false
-) : ShaderInputAttributeHandle<T>(descriptor, isNormalized) {
+    internal val descriptor: ShaderInputAttributeDescriptor<T>, internal val isNormalized: Boolean = false
+) {
     companion object {
         fun int(): ShaderVertexAttributeHandle<Int> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.INT)
         fun ivec2(): ShaderVertexAttributeHandle<IVec2> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.IVEC2)
@@ -65,8 +64,8 @@ class ShaderVertexAttributeHandle<T> private constructor(
     }
 }
 class ShaderInstanceAttributeHandle<T> private constructor(
-    descriptor: ShaderInputAttributeDescriptor<T>, isNormalized: Boolean = false
-) : ShaderInputAttributeHandle<T>(descriptor, isNormalized) {
+    internal val descriptor: ShaderInputAttributeDescriptor<T>, internal val isNormalized: Boolean = false
+) {
     companion object {
         fun int(): ShaderInstanceAttributeHandle<Int> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.INT)
         fun ivec2(): ShaderInstanceAttributeHandle<IVec2> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.IVEC2)

@@ -54,7 +54,7 @@ class Button : UIElement<Button>("Unnamed Button") {
     fun getSizePercentage(): SizePercentage = this.sizePercentage
     fun isActive(): Boolean = this.isActive
 
-    override fun setShader(vararg specs: ShaderSpec, data: Array<ShaderData>): Button = apply {
+    override fun setShader(vararg specs: ShaderSpec, data: List<ShaderData>): Button = apply {
         super.setShader(Button.SHADER_SPEC, *specs, data = data)
     }
     fun setSizePercentage(percentage: SizePercentage): Button = apply {
