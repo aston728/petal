@@ -1,10 +1,10 @@
 plugins {
-    kotlin("jvm")
-    `java-library`
+    this.kotlin("jvm")
+    this.`java-library`
 }
 
-val lwjglVersion = "3.4.1"
-val lwjglNatives = Pair(
+extra["lwjglVersion"] = "3.4.1"
+extra["lwjglNatives"] = Pair(
     System.getProperty("os.name")!!,
     System.getProperty("os.arch")!!
 ).let { (name, arch) ->
@@ -33,19 +33,16 @@ val lwjglNatives = Pair(
 }
 
 dependencies {
-    implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
+    this.api(this.project(":engine:core"))
+    this.api(this.project(":engine:elements"))
+    this.api(this.project(":engine:openGLRenderer"))
+    this.api(this.project(":engine:vulkanRenderer"))
+}
 
-    implementation("org.lwjgl:lwjgl")
-    implementation("org.lwjgl:lwjgl-glfw")
-    implementation("org.lwjgl:lwjgl-opengl")
-    implementation("org.lwjgl:lwjgl-openal")
-    implementation("org.lwjgl:lwjgl-stb")
-    implementation("org.lwjgl:lwjgl-freetype")
-
-    runtimeOnly("org.lwjgl:lwjgl::$lwjglNatives")
-    runtimeOnly("org.lwjgl:lwjgl-glfw::$lwjglNatives")
-    runtimeOnly("org.lwjgl:lwjgl-opengl::$lwjglNatives")
-    runtimeOnly("org.lwjgl:lwjgl-openal::$lwjglNatives")
-    runtimeOnly("org.lwjgl:lwjgl-stb::$lwjglNatives")
-    runtimeOnly("org.lwjgl:lwjgl-freetype::$lwjglNatives")
+subprojects {
+    this.plugins.withId("org.jetbrains.kotlin.jvm") {
+        extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
+            this.explicitApi()
+        }
+    }
 }

@@ -1,12 +1,12 @@
 plugins {
-    kotlin("jvm")
-    application
+    this.kotlin("jvm")
+    this.application
 }
 
 dependencies {
-    implementation(project(":engine"))
+    this.implementation(this.project(":engine"))
 }
 
 application {
-    mainClass.set("com.aston728.app.MainKt")
+    this.mainClass.set("com.aston728.app.MainKt")
 }
