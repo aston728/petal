@@ -9,7 +9,12 @@ public abstract class Graphics {
     protected abstract val _shaderBuilder: ShaderBuilder
     protected abstract val _renderer: Renderer
 
+    protected abstract fun onDestroy(): Unit
+
     internal fun getContextProvider(): (Long, Boolean, ErrorHandler) -> GraphicsContext = this._contextProvider
     internal fun getShaderBuilder(): ShaderBuilder = this._shaderBuilder
     internal fun getRenderer(): Renderer = this._renderer
+    internal fun free(): Unit {
+        this.onDestroy()
+    }
 }

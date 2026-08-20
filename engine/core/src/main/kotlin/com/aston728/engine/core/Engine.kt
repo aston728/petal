@@ -95,7 +95,8 @@ public class Engine private constructor(config: EngineConfig) {
         return EngineContext(
             this.mouse, this.keyboard,
             MonitorService(), TimeService(), clipboard,
-            this.eventManager, this.shaderManager,
+            this.eventManager, AssetManager(this.logger),
+            this.shaderManager,
             this.logger, isDebugOn = (engineMode == EngineMode.DEBUG),
         )
     }
@@ -150,7 +151,7 @@ public class Engine private constructor(config: EngineConfig) {
 
     public fun createWindow(): Window {
         val window: Window = Window(
-            this.context, this.allWindows.firstOrNull()?.getInternalWindow()?.getHandle(),
+            this.context, this.allWindows.firstOrNull(),
             this.graphics.getContextProvider(),
             debugMessageCallback = { message -> this.logger.error("RUNTIME (DEBUG)", message) }
         )
@@ -287,21 +288,21 @@ public class Engine private constructor(config: EngineConfig) {
             this.keyboard.cleanup()
             this.handleEvents()
 
-            this.focusedWindow?.getUI()?.update()
-            this.activeWindows.forEach { it.handleUIDirtyFlags() }
-
             this.focusedWindow?.getUI()?.refreshHoveredElement()
             this.focusedWindow?.setCursor(this.focusedWindow?.getUI()?.getHoveredElement()?.getCursorType())
+            this.focusedWindow?.getUI()?.update()
 
             this.activeWindows.forEach {
                 it.getGraphicsContext().makeCurrent()
-                it.getUI()?.draw(this.graphics.getRenderer())
+                it.getUI()?.draw(it.getGraphicsContext(), this.graphics.getRenderer())
                 it.getGraphicsContext().swapBuffers()
             }
 
+            this.activeWindows.forEach { it.handleUIDirtyFlags() }
             this.fps++
         }
 
         this.shaderManager.releaseAll()
+        this.graphics.free()
     }
 }

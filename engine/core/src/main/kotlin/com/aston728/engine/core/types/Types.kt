@@ -4,11 +4,12 @@ import com.aston728.engine.core.Event
 import com.aston728.engine.core.elementBase.UIElement
 import com.aston728.engine.core.geometry.IntPosition
 import com.aston728.engine.core.geometry.Rect
-import com.aston728.engine.core.internals.image.InternalImg
+import com.aston728.engine.core.internals.image.Image
 import com.aston728.engine.core.internals.image.InternalTextRenderer
 
-public typealias Img = InternalImg
-public typealias Imgs = List<Img>
+// TODO
+public typealias Img = Image
+public typealias Imgs = List<Image>
 public typealias Rects = List<Rect>
 public typealias TextRender = InternalTextRenderer
 public typealias FontBytes = ByteArray

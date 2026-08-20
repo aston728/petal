@@ -11,7 +11,15 @@ import org.lwjgl.system.MemoryUtil.NULL
 
 internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debugMessageCallback: ErrorHandler) : GraphicsContext() {
     private val capabilities: GLCapabilities = this.createCapabilities()
+    private val textureBindings: IntArray by lazy {
+        IntArray(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS - GL_TEXTURE0 - 1) { 0 }
+    }
+    private val samplerBindings: IntArray by lazy {
+        IntArray(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS - GL_TEXTURE0 - 1) { 0 }
+    }
     init {
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         if (isDebugOn) { this.enableDebugging(debugMessageCallback) }
     }
 
@@ -144,16 +152,25 @@ internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debug
     }
 
     override fun onGetHandle(): Long = this.handle
-
+    override fun onMakeCurrent(): Unit {
+        glfwMakeContextCurrent(this.handle)
+        GL.setCapabilities(this.capabilities)
+    }
     override fun onResize(size: IntSize): Unit {
         glfwMakeContextCurrent(this.handle)
         GL.setCapabilities(this.capabilities)
         glViewport(0, 0, size.width, size.height)
     }
-
-    override fun onMakeCurrent(): Unit {
-        glfwMakeContextCurrent(this.handle)
-        GL.setCapabilities(this.capabilities)
+    override fun bindTexture(unit: Int, texture: Int, textureType: Int, sampler: Int): Unit {
+        if (this.textureBindings[unit] != texture) {
+            this.textureBindings[unit] = texture
+            glActiveTexture(GL_TEXTURE0 + unit)
+            glBindTexture(textureType, texture)
+        }
+        if (this.samplerBindings[unit] != sampler) {
+            this.samplerBindings[unit] = sampler
+            glBindSampler(unit, sampler)
+        }
     }
     override fun onSwapBuffers(): Unit {
         glfwSwapBuffers(this.handle)

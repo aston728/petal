@@ -175,7 +175,7 @@ public class UI : NamedObject<UI>("Unnamed UI") {
     internal fun handleDirtyShaders(graphicsContext: GraphicsContext): UI = apply {
         graphicsContext.makeCurrent()
         for (element in this.elements) {
-            if (DirtyFlags.SHADER in element.getDirtyFlags()) { element.commitShaderChange(graphicsContext.getHandle()) }
+            if (DirtyFlags.SHADER in element.getDirtyFlags()) { element.commitShaderChange(graphicsContext) }
         }
     }
 
@@ -189,7 +189,7 @@ public class UI : NamedObject<UI>("Unnamed UI") {
             .filter { it.isVisible() }
             .forEach { it.update(this.hoveredElement) }
     }
-    internal fun draw(renderer: Renderer): Unit {
+    internal fun draw(context: GraphicsContext, renderer: Renderer): Unit {
         val elements: List<GenericUIElement> = this.elements.sortedBy { it.getLayer() }
         val drawSequence: DrawSequence = elements
             .filter { it.isVisible() }
@@ -197,7 +197,7 @@ public class UI : NamedObject<UI>("Unnamed UI") {
 
         renderer.clearWith(this.backgroundColor)
         renderer.draw(drawSequence)
-        elements.forEach { it.draw() } // TODO
+        elements.forEach { it.draw(context) } // TODO
     }
 
     internal fun onFocus(): Unit {

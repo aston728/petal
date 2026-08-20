@@ -12,12 +12,12 @@ import com.aston728.engine.core.utils.NamedObject
 import kotlin.reflect.KClass
 
 public class Window internal constructor(
-    private var context: EngineContext, sharedHandle: Long?,
+    private var context: EngineContext, sharedContext: Window?,
     graphicsContextProvider: (Long, Boolean, ErrorHandler) -> GraphicsContext,
     debugMessageCallback: ErrorHandler
 ) : NamedObject<Window>("Unnamed Window") {
     private var initialSize: IntSize = IntSize(500, 500)
-    private val internalWindow: InternalWindow = this.createInternalWindow(sharedHandle)
+    private val internalWindow: InternalWindow = this.createInternalWindow(sharedContext)
     private var state: WindowState = if (this.internalWindow.exists()) { WindowState.ALIVE } else { WindowState.NONEXISTING }
 
     private var defaultCursor: Cursor = Cursor.ARROW
@@ -29,8 +29,8 @@ public class Window internal constructor(
         if (this.state != WindowState.ALIVE) { BlankGraphicsContext() }
         else { graphicsContextProvider(this.internalWindow.getHandle(), this.context.isDebugOn, debugMessageCallback) }
 
-    private fun createInternalWindow(sharedHandle: Long?): InternalWindow {
-        val window: InternalWindow = InternalWindow(sharedHandle, this.context.isDebugOn)
+    private fun createInternalWindow(sharedContext: Window?): InternalWindow {
+        val window: InternalWindow = InternalWindow(sharedContext?.getInternalWindow()?.getHandle(), this.context.isDebugOn)
         if (window.exists()) {
             window
                 .setTitle("Untitled Window")

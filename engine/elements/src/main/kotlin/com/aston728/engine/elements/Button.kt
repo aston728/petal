@@ -4,21 +4,18 @@ import com.aston728.engine.core.elementBase.UIElement
 import com.aston728.engine.core.geometry.IntSize
 import com.aston728.engine.core.internals.devices.Cursor
 import com.aston728.engine.core.internals.devices.MouseButton
-import com.aston728.engine.core.internals.image.ImageUtils
+import com.aston728.engine.core.internals.image.Image
 import com.aston728.engine.core.math.Vec2
-import com.aston728.engine.core.rendererBase.ShaderAttributeType
-import com.aston728.engine.core.rendererBase.ShaderData
-import com.aston728.engine.core.rendererBase.ShaderSpec
-import com.aston728.engine.core.rendererBase.ShaderVertexAttributeHandle
+import com.aston728.engine.core.rendererBase.*
 import com.aston728.engine.core.types.*
 import com.aston728.engine.core.utils.Handle
 import kotlin.math.roundToInt
 
 public class Button : UIElement<Button>("Unnamed Button") {
     public companion object {
-        public val DEFAULT_IMG_NORMAL: Img = 0
-        public val DEFAULT_IMG_HOVERED: Img = 0
-        public val DEFAULT_IMG_DISABLED: Img = 0
+        public val DEFAULT_IMG_NORMAL: Img = Image.DEFAULT_IMG
+        public val DEFAULT_IMG_HOVERED: Img = Image.DEFAULT_IMG
+        public val DEFAULT_IMG_DISABLED: Img = Image.DEFAULT_IMG
 
         private val SHADER_POSITION: ShaderVertexAttributeHandle<Vec2> = ShaderVertexAttributeHandle.vec2()
         private val SHADER_SPEC: ShaderSpec = ShaderSpec()
@@ -34,7 +31,7 @@ public class Button : UIElement<Button>("Unnamed Button") {
         Button.DEFAULT_IMG_HOVERED,
         Button.DEFAULT_IMG_DISABLED,
     )
-    private var imgs: Imgs = ImageUtils.scale(this.initImgs, IntSize(0, 0))
+    private var imgs: Imgs = this.initImgs.map { it.scaledTo(IntSize(0, 0)) }
 
     private var isActive: Boolean = true
     private val onClickHandlers: MutableList<Handler> = mutableListOf()
@@ -53,7 +50,7 @@ public class Button : UIElement<Button>("Unnamed Button") {
             this._context.logger.warn("BUTTON", "$this expected 3 images (unhovered, hovered, disabled), got ${imgs.size}")
         } else {
             this.initImgs = imgs
-            this.imgs = ImageUtils.scale(imgs, this._rect.getSize())
+            this.imgs = imgs.map { it.scaledTo(this._rect.getSize()) }
         }
     }
     public fun setActive(isActive: Boolean): Button = apply {
@@ -65,8 +62,8 @@ public class Button : UIElement<Button>("Unnamed Button") {
         handle?.setOnRemoveHandler { this.onClickHandlers.remove(handler) }
     }
 
-    override fun onCommitShaderChange(contextHandle: Long): Unit {
-        super.onCommitShaderChange(contextHandle)
+    override fun onCommitShaderChange(context: GraphicsContext): Unit {
+        super.onCommitShaderChange(context)
         this._shaderInstanceHandle
             .setVertexAttribute(Button.SHADER_POSITION, arrayOf(Vec2(-1.0f, -0.5f), Vec2(-0.5f, -0.5f), Vec2(-0.5f,  0.5f), Vec2(-1.0f,  0.5f)))
     }
@@ -77,7 +74,7 @@ public class Button : UIElement<Button>("Unnamed Button") {
             (fullSize.width / 100 * this._sizePercentage.width).roundToInt(),
             (fullSize.height / 100 * this._sizePercentage.height).roundToInt(),
         ))
-        this.imgs = ImageUtils.scale(this.initImgs, this._rect.getSize())
+        this.imgs = this.initImgs.map { it.scaledTo(this._rect.getSize()) }
         return super.onResize(fullSize)
     }
     override fun computeDrawSequence(hoveredElement: GenericUIElement?): DrawSequence {

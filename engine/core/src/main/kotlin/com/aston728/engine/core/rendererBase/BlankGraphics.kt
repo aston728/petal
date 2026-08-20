@@ -10,4 +10,6 @@ internal class BlankGraphics : Graphics() {
     }
     override val _shaderBuilder: ShaderBuilder = BlankShaderBuilder()
     override val _renderer: Renderer = BlankRenderer()
+
+    override fun onDestroy() {}
 }

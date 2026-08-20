@@ -2,7 +2,7 @@ package com.aston728.engine.core.rendererBase
 
 import com.aston728.engine.core.types.ErrorHandler
 
-private data class ShaderRepresentation(private val contextHandle: Long, val spec: ShaderSpec)
+private data class ShaderRepresentation(private val context: GraphicsContext, val spec: ShaderSpec)
 
 internal class ShaderManager(
     private val builder: ShaderBuilder = BlankShaderBuilder(),
@@ -17,21 +17,23 @@ internal class ShaderManager(
         return this.specCache.getOrPut(spec.getRepresentation()) { spec }
     }
 
-    override fun acquire(contextHandle: Long, spec: ShaderSpec): ShaderInstanceHandle? {
-        if (!spec.checkValidity(this.errorCallback)) {
+    override fun acquire(context: GraphicsContext, spec: ShaderSpec): ShaderInstanceHandle? {
+        val specError: String? = spec.checkValidity()
+        if (specError != null) {
+            this.errorCallback(specError)
             this.specCache.remove(spec.getRepresentation())
             return null
         }
 
         spec.freeze()
-        val shader: Shader = this.shaderCache.getOrPut(ShaderRepresentation(contextHandle, spec)) {
+        val shader: Shader = this.shaderCache.getOrPut(ShaderRepresentation(context, spec)) {
             val shader: Shader? = this.builder.build(spec, this.errorCallback)
             if (shader == null) {
                 this.specCache.remove(spec.getRepresentation())
                 return null
             }
 
-            spec.getUniforms().forEach { it.applyDefault(shader) }
+            spec.getUniformsUnsafe().forEach { it.applyDefault(shader) }
             shader
         }
 

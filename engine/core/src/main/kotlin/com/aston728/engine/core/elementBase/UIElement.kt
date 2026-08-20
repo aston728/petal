@@ -130,11 +130,11 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     protected open fun onResize(fullSize: IntSize): Unit {
         this.dirtyFlags -= DirtyFlags.SIZE
     }
-    protected open fun onCommitShaderChange(contextHandle: Long): Unit {
-        var instanceHandle: ShaderInstanceHandle? = this._context.shaderProvider.acquire(contextHandle, this.shaderSpec)
+    protected open fun onCommitShaderChange(context: GraphicsContext): Unit {
+        var instanceHandle: ShaderInstanceHandle? = this._context.shaderProvider.acquire(context, this.shaderSpec)
         if (instanceHandle == null && this._shaderInstanceHandle.shader is BlankShader) {
             this.setToDefaultShader()
-            instanceHandle = this._context.shaderProvider.acquire(contextHandle, this.shaderSpec)
+            instanceHandle = this._context.shaderProvider.acquire(context, this.shaderSpec)
             this.shaderData = emptyList()
         }
 
@@ -154,11 +154,11 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     internal fun discardParentChange(): Unit = this.onDiscardParentChange()
     internal fun reposition(): Unit =  this.onReposition()
     internal fun resize(fullSize: IntSize): Unit = this.onResize(fullSize)
-    internal fun commitShaderChange(contextHandle: Long): Unit = this.onCommitShaderChange(contextHandle)
+    internal fun commitShaderChange(context: GraphicsContext): Unit = this.onCommitShaderChange(context)
     internal fun getDrawSequence(hoveredElement: GenericUIElement?): DrawSequence = this.computeDrawSequence(hoveredElement)
     internal fun update(hoveredElement: GenericUIElement?): Unit = this.onUpdate(hoveredElement)
 
-    internal fun draw(): Unit {  // TODO
-        this._shaderInstanceHandle.draw()
+    internal fun draw(graphicsContext: GraphicsContext): Unit {  // TODO
+        this._shaderInstanceHandle.shader.draw(graphicsContext)
     }
 }

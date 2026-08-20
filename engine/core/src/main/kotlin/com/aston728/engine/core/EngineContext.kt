@@ -13,13 +13,15 @@ import com.aston728.engine.core.rendererBase.ShaderProvider
 public class EngineContext internal constructor(
     public val mouse: Mouse, public val keyboard: Keyboard,
     public val monitors: MonitorService, public val time: TimeService, public val clipboard: ClipboardService,
-    public val eventSubscriber: EventSubscriber, internal val shaderProvider: ShaderProvider,
+    public val eventSubscriber: EventSubscriber, public val assetManager: AssetManager,
+    internal val shaderProvider: ShaderProvider,
     public val logger: FrozenLogger, public val isDebugOn: Boolean,
 )
 
 internal val defaultEngineContext: EngineContext = EngineContext(
     MouseController(), KeyboardController(),
     MonitorService(), TimeService(), ClipboardService(),
-    EventManager(), ShaderManager(),
+    EventManager(), AssetManager(Logger()),
+    ShaderManager(),
     Logger().setShowInfo(true).setShowWarnings(true).setShowErrors(true), isDebugOn = false,
 )

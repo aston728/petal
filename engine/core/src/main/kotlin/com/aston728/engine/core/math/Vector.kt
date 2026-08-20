@@ -4,6 +4,10 @@ public data class IVec2(public val first: Int = 0, public val second: Int = 0)
 public data class IVec3(public val first: Int = 0, public val second: Int = 0, public val third: Int = 0)
 public data class IVec4(public val first: Int = 0, public val second: Int = 0, public val third: Int = 0, public val fourth: Int = 0)
 
+public data class BoolVec2(public val first: Boolean = false, public val second: Boolean = false)
+public data class BoolVec3(public val first: Boolean = false, public val second: Boolean = false, public val third: Boolean = false)
+public data class BoolVec4(public val first: Boolean = false, public val second: Boolean = false, public val third: Boolean = false, public val fourth: Boolean = false)
+
 public data class BVec2(public val first: Byte = 0, public val second: Byte = 0)
 public data class BVec3(public val first: Byte = 0, public val second: Byte = 0, public val third: Byte = 0)
 public data class BVec4(public val first: Byte = 0, public val second: Byte = 0, public val third: Byte = 0, public val fourth: Byte = 0)

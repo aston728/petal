@@ -14,9 +14,9 @@ import org.lwjgl.glfw.GLFWNativeWin32
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.windows.User32
 
-internal class InternalWindow(sharedHandle: Long?, shouldHaveDebugContext: Boolean) {
+internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext: Boolean) {
     // TODO: how to content scale
-    private var handle: Long = this.create(sharedHandle, shouldHaveDebugContext)
+    private var handle: Long = this.create(sharedContextHandle, shouldHaveDebugContext)
 
     private var savedPosition: IntPosition = if (this.exists()) { this.getPosition() } else { IntPosition() }
     private var savedSize: IntSize = if (this.exists()) { this.getSize() } else { IntSize() }
@@ -36,7 +36,7 @@ internal class InternalWindow(sharedHandle: Long?, shouldHaveDebugContext: Boole
     private var cursor: Cursor = Cursor.ARROW
     private var glfwCursor: Long = glfwCreateStandardCursor(this.cursor.toGLFWCursor())
 
-    private fun create(sharedHandle: Long?, shouldHaveDebugContext: Boolean): Long {
+    private fun create(sharedContextHandle: Long?, shouldHaveDebugContext: Boolean): Long {
         glfwDefaultWindowHints()
 
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
@@ -48,7 +48,7 @@ internal class InternalWindow(sharedHandle: Long?, shouldHaveDebugContext: Boole
         }
 
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
-        return glfwCreateWindow(1, 1, "", NULL, sharedHandle ?: NULL)
+        return glfwCreateWindow(1, 1, "", NULL, sharedContextHandle ?: NULL)
     }
 
     internal fun getHandle(): Long = this.handle

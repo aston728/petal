@@ -7,7 +7,8 @@ import org.lwjgl.opengl.GL33C.*
 
 internal class OpenGLRenderer : Renderer() {
     override fun onClearWith(color: Color): Unit {
-        glClearColor(color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, color.a / 255.0f)
+        val normalizedColor: FloatArray = color.toNormalizedFloatArray()
+        glClearColor(normalizedColor[0], normalizedColor[1], normalizedColor[2], normalizedColor[3])
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
     }
     override fun onDraw(sequence: DrawSequence): Unit {

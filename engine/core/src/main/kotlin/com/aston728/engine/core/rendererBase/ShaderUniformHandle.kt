@@ -9,6 +9,10 @@ public value class ShaderUniformHandle<T> private constructor(public val type: S
         public fun iVec2(): ShaderUniformHandle<IVec2> = ShaderUniformHandle(ShaderUniformType.IVec2)
         public fun iVec3(): ShaderUniformHandle<IVec3> = ShaderUniformHandle(ShaderUniformType.IVec3)
         public fun iVec4(): ShaderUniformHandle<IVec4> = ShaderUniformHandle(ShaderUniformType.IVec4)
+        public fun bool(): ShaderUniformHandle<Boolean> = ShaderUniformHandle(ShaderUniformType.Bool)
+        public fun boolVec2(): ShaderUniformHandle<BoolVec2> = ShaderUniformHandle(ShaderUniformType.BoolVec2)
+        public fun boolVec3(): ShaderUniformHandle<BoolVec3> = ShaderUniformHandle(ShaderUniformType.BoolVec3)
+        public fun boolVec4(): ShaderUniformHandle<BoolVec4> = ShaderUniformHandle(ShaderUniformType.BoolVec4)
         public fun uint(): ShaderUniformHandle<UInt> = ShaderUniformHandle(ShaderUniformType.UInt)
         public fun uiVec2(): ShaderUniformHandle<UIVec2> = ShaderUniformHandle(ShaderUniformType.UIVec2)
         public fun uiVec3(): ShaderUniformHandle<UIVec3> = ShaderUniformHandle(ShaderUniformType.UIVec3)
@@ -45,5 +49,8 @@ public value class ShaderUniformHandle<T> private constructor(public val type: S
         public fun mat4(shouldTranspose: Boolean = false): ShaderUniformHandle<Mat4> = ShaderUniformHandle(
             if (shouldTranspose) { ShaderUniformType.TMat4 } else { ShaderUniformType.Mat4 }
         )
+
+        public fun img2D(): ShaderUniformHandle<ShaderSampledImage2D> = ShaderUniformHandle(ShaderUniformType.Image2DSampler)
+        public fun img2DArray(): ShaderUniformHandle<ShaderSampledImage2DArray> = ShaderUniformHandle(ShaderUniformType.Image2DArraySampler)
     }
 }

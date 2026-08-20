@@ -7,13 +7,14 @@ import org.lwjgl.opengl.GL33C.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-private class ShaderAttributeData(val name: String, val location: Int)
+private fun boolToInt(bool: Boolean): Int = if (bool) { 1 } else { 0 }
+private class OpenGLShaderAttributeData(val name: String, val location: Int)
 
 internal class OpenGLShader(
     name: String,
     vertexAttributesInfo: List<OpenGLShaderVertexAttributeBinding>, private val vertexDataStrideSize: Int, private val verticesPerInstance: Int,
     instanceAttributesInfo: List<OpenGLShaderInstanceAttributeBinding>, private val instanceDataStrideSize: Int,
-    uniformsInfo: List<ShaderUniformInfo<*>>,
+    uniformsInfo: List<ShaderUniformInfo<*>>, private val samplerManager: OpenGLShaderSamplerManager,
     vertexSource: String, fragmentSource: String,
     private val errorCallback: ErrorHandler,
 ) : Shader(name) {
@@ -33,18 +34,33 @@ internal class OpenGLShader(
     private val ebo: Int = glGenBuffers()
     private var program: Int = this.createProgram(vertexSource, fragmentSource)
 
-    private val vertexAttributeMappings: Map<ShaderVertexAttributeHandle<*>, ShaderAttributeData> by lazy {
-        vertexAttributesInfo.associate { it.handle to ShaderAttributeData(it.name, it.bufferLocation) }
+    private val vertexAttributeMappings: Map<ShaderVertexAttributeHandle<*>, OpenGLShaderAttributeData> by lazy {
+        vertexAttributesInfo.associate { it.handle to OpenGLShaderAttributeData(it.name, it.bufferLocation) }
     }
-    private val instanceAttributeMappings: Map<ShaderInstanceAttributeHandle<*>, ShaderAttributeData> by lazy {
-        instanceAttributesInfo.associate { it.handle to ShaderAttributeData(it.name, it.bufferLocation) }
+    private val instanceAttributeMappings: Map<ShaderInstanceAttributeHandle<*>, OpenGLShaderAttributeData> by lazy {
+        instanceAttributesInfo.associate { it.handle to OpenGLShaderAttributeData(it.name, it.bufferLocation) }
     }
-    private val uniformMappings: Map<ShaderUniformHandle<*>, ShaderAttributeData> =
+    private val uniformMappings: Map<ShaderUniformHandle<*>, OpenGLShaderAttributeData> =
         if (this.isValid()) {
-            uniformsInfo.associate { it.handle to ShaderAttributeData(it.name, glGetUniformLocation(this.program, it.name)) }
+            uniformsInfo.associate { it.handle to OpenGLShaderAttributeData(it.name, glGetUniformLocation(this.program, it.name)) }
         } else {
             emptyMap()
         }
+
+    private val textureUnitMappings: Map<ShaderUniformHandle<*>, Int> by lazy { buildMap {
+        uniformsInfo.forEachIndexed { i, info ->
+            if (info.handle.type.isSampler) { this[info.handle] = i }
+        }
+    }}
+    private val textureBindings: IntArray by lazy {
+        IntArray(this.textureUnitMappings.size) { 0 }
+    }
+    private val textureTypeBindings: IntArray by lazy {
+        IntArray(this.textureUnitMappings.size) { 0 }
+    }
+    private val samplerBindings: IntArray by lazy {
+        IntArray(this.textureUnitMappings.size) { 0 }
+    }
 
     private fun createProgram(vertexSource: String, fragmentSource: String): Int {
         val vertexShader: Int = glCreateShader(GL_VERTEX_SHADER)
@@ -90,29 +106,30 @@ internal class OpenGLShader(
         glUseProgram(this.program)
         glBindVertexArray(this.vao)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this.ebo)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, intArrayOf(0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4), GL_STATIC_DRAW)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, intArrayOf(0, 1, 2, 1, 2, 3), GL_STATIC_DRAW)
 
         return program
     }
 
     override fun isValid(): Boolean = this.program != OpenGLShader.INVALID_PROGRAM
 
-    private fun growBuffer(buffer: ByteBuffer, extraBytes: Int): ByteBuffer {
-        val newBuffer: ByteBuffer = ByteBuffer.allocateDirect(buffer.capacity() + extraBytes).order(ByteOrder.nativeOrder())
-        buffer.rewind()
-        newBuffer.put(buffer)
-        newBuffer.rewind()
-        return newBuffer
-    }
     override fun onAddInstance(): Unit {
         glUseProgram(this.program)
         glBindVertexArray(this.vao)
 
-        this.vertexData = this.growBuffer(this.vertexData, this.vertexDataStrideSize * this.verticesPerInstance)
+        this.vertexData = ByteBuffer
+            .allocateDirect(this.vertexData.capacity() + this.vertexDataStrideSize * this.verticesPerInstance)
+            .order(ByteOrder.nativeOrder())
+            .put(this.vertexData)
+            .rewind()
         glBindBuffer(GL_ARRAY_BUFFER, this.vertexBuffer)
         glBufferData(GL_ARRAY_BUFFER, this.vertexData, GL_STATIC_DRAW)
 
-        this.instanceData = this.growBuffer(this.instanceData, this.instanceDataStrideSize)
+        this.instanceData = ByteBuffer
+            .allocateDirect(this.instanceData.capacity() + this.instanceDataStrideSize)
+            .order(ByteOrder.nativeOrder())
+            .put(this.instanceData)
+            .rewind()
         glBindBuffer(GL_ARRAY_BUFFER, this.instanceBuffer)
         glBufferData(GL_ARRAY_BUFFER, this.instanceData, GL_STATIC_DRAW)
     }
@@ -120,15 +137,12 @@ internal class OpenGLShader(
         val removedLength: Int = endI - startI + 1
         val newBuffer: ByteBuffer = ByteBuffer.allocateDirect(buffer.capacity() - removedLength).order(ByteOrder.nativeOrder())
 
-        buffer.position(0)
-        buffer.limit(startI)
+        buffer.position(0).limit(startI)
         newBuffer.put(buffer)
-        buffer.position(endI + 1)
-        buffer.limit(buffer.capacity())
+        buffer.position(endI + 1).limit(buffer.capacity())
         newBuffer.put(buffer)
 
-        newBuffer.flip()
-        return newBuffer
+        return newBuffer.flip()
     }
     override fun onRemoveInstance(i: Int): Unit {
         glUseProgram(this.program)
@@ -150,7 +164,7 @@ internal class OpenGLShader(
         handle: ShaderVertexAttributeHandle<T>, updater: (ByteBuffer, Int, T) -> Unit, instanceI: Int,
         values: Array<T>
     ): Unit {
-        val data: ShaderAttributeData? = this.vertexAttributeMappings[handle]
+        val data: OpenGLShaderAttributeData? = this.vertexAttributeMappings[handle]
         if (data == null) {
             this.errorCallback("Cannot set vertex attribute, this handle isn't registered to $this")
         } else if (!this.isValid()) {
@@ -170,7 +184,7 @@ internal class OpenGLShader(
         handle: ShaderInstanceAttributeHandle<T>, updater: (ByteBuffer, Int, T) -> Unit, instanceI: Int,
         value: T
     ): Unit {
-        val data: ShaderAttributeData? = this.instanceAttributeMappings[handle]
+        val data: OpenGLShaderAttributeData? = this.instanceAttributeMappings[handle]
         if (data == null) {
             this.errorCallback("Cannot set instance attribute, this handle isn't registered to $this")
         } else if (!this.isValid()) {
@@ -186,18 +200,26 @@ internal class OpenGLShader(
         ShaderUniformType.IVec2 -> {{ glUniform2i(location, (value as IVec2).first, value.second) }}
         ShaderUniformType.IVec3 -> {{ glUniform3i(location, (value as IVec3).first, value.second, value.third) }}
         ShaderUniformType.IVec4 -> {{ glUniform4i(location, (value as IVec4).first, value.second, value.third, value.fourth) }}
-        ShaderUniformType.UInt -> {{
-            glUniform1ui(location, (value as UInt).toInt())
+        ShaderUniformType.Bool -> {{
+            value as Boolean
+            glUniform1i(location, boolToInt(value))
         }}
-        ShaderUniformType.UIVec2 -> {{
-            glUniform2ui(location, (value as UIVec2).first.toInt(), value.second.toInt())
+        ShaderUniformType.BoolVec2 -> {{
+            value as BoolVec2
+            glUniform2i(location, boolToInt(value.first), boolToInt(value.second))
         }}
-        ShaderUniformType.UIVec3 -> {{
-            glUniform3ui(location, (value as UIVec3).first.toInt(), value.second.toInt(), value.third.toInt())
+        ShaderUniformType.BoolVec3 -> {{
+            value as BoolVec3
+            glUniform3i(location, boolToInt(value.first), boolToInt(value.second), boolToInt(value.third))
         }}
-        ShaderUniformType.UIVec4 -> {{
-            glUniform4ui(location, (value as UIVec4).first.toInt(), value.second.toInt(), value.third.toInt(), value.fourth.toInt())
+        ShaderUniformType.BoolVec4 -> {{
+            value as BoolVec4
+            glUniform4i(location, boolToInt(value.first), boolToInt(value.second), boolToInt(value.third), boolToInt(value.fourth))
         }}
+        ShaderUniformType.UInt -> {{ glUniform1ui(location, (value as UInt).toInt()) }}
+        ShaderUniformType.UIVec2 -> {{ glUniform2ui(location, (value as UIVec2).first.toInt(), value.second.toInt()) }}
+        ShaderUniformType.UIVec3 -> {{ glUniform3ui(location, (value as UIVec3).first.toInt(), value.second.toInt(), value.third.toInt()) }}
+        ShaderUniformType.UIVec4 -> {{ glUniform4ui(location, (value as UIVec4).first.toInt(), value.second.toInt(), value.third.toInt(), value.fourth.toInt()) }}
         ShaderUniformType.Float -> {{ glUniform1f(location, value as Float) }}
         ShaderUniformType.Vec2 -> {{ glUniform2f(location, (value as Vec2).first, value.second) }}
         ShaderUniformType.Vec3 -> {{ glUniform3f(location, (value as Vec3).first, value.second, value.third) }}
@@ -220,9 +242,25 @@ internal class OpenGLShader(
         ShaderUniformType.TMat4x3 -> {{ glUniformMatrix4x3fv(location, true, (value as Mat4x3).toFlatArray()) }}
         ShaderUniformType.Mat4 -> {{ glUniformMatrix4fv(location, false, (value as Mat4).toFlatArray()) }}
         ShaderUniformType.TMat4 -> {{ glUniformMatrix4fv(location, true, (value as Mat4).toFlatArray()) }}
+        ShaderUniformType.Image2DSampler -> {{
+            value as ShaderSampledImage2D
+            val unit: Int = this.textureUnitMappings[handle]!!
+            this.textureBindings[unit] = this.samplerManager.getTexture2D(value.img)
+            this.textureTypeBindings[unit] = GL_TEXTURE_2D
+            this.samplerBindings[unit] = this.samplerManager.getGLSampler(value.sampler)
+            glUniform1i(location, unit)
+        }}
+        ShaderUniformType.Image2DArraySampler -> {{
+            value as ShaderSampledImage2DArray
+            val unit: Int = this.textureUnitMappings[handle]!!
+            this.textureBindings[unit] = this.samplerManager.getTexture2DArray(value.imgs)
+            this.textureTypeBindings[unit] = GL_TEXTURE_2D_ARRAY
+            this.samplerBindings[unit] = this.samplerManager.getGLSampler(value.sampler)
+            glUniform1i(location, unit)
+        }}
     }
     override fun <T> setUniform(handle: ShaderUniformHandle<T>, value: T): Unit {
-        val data: ShaderAttributeData? = this.uniformMappings[handle]
+        val data: OpenGLShaderAttributeData? = this.uniformMappings[handle]
         if (data == null) {
             this.errorCallback("Cannot set uniform, this handle isn't registered to $this")
         } else if (!this.isValid()) {
@@ -250,18 +288,16 @@ internal class OpenGLShader(
         glDeleteProgram(this.program)
         this.program = OpenGLShader.INVALID_PROGRAM
     }
-    override fun onDraw(): Unit { // TODO
+    override fun onDraw(graphicsContext: GraphicsContext): Unit { // TODO
         glUseProgram(this.program)
         glBindVertexArray(this.vao)
 
         if (this.isVertexDataDirty) {
-            this.vertexData.rewind()
             glBindBuffer(GL_ARRAY_BUFFER, this.vertexBuffer)
             glBufferSubData(GL_ARRAY_BUFFER, 0, this.vertexData)
             this.isVertexDataDirty = false
         }
         if (this.isInstanceDataDirty) {
-            this.instanceData.rewind()
             glBindBuffer(GL_ARRAY_BUFFER, this.instanceBuffer)
             glBufferSubData(GL_ARRAY_BUFFER, 0, this.instanceData)
             this.isInstanceDataDirty = false
@@ -271,6 +307,10 @@ internal class OpenGLShader(
             this.uniformUpdatesQueue.clear()
         }
 
-        glDrawElements(GL_TRIANGLES, 12, GL_UNSIGNED_INT, 0)
+        this.textureBindings.indices.forEach {
+            graphicsContext.bindTexture(it, this.textureBindings[it], this.textureTypeBindings[it], this.samplerBindings[it])
+        }
+
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0)
     }
 }

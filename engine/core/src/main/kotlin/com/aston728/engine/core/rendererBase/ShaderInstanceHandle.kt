@@ -7,6 +7,4 @@ public class ShaderInstanceHandle internal constructor(internal val shader: Shad
     public fun <T> setInstanceAttribute(handle: ShaderInstanceAttributeHandle<T>, value: T): ShaderInstanceHandle = apply {
         this.shader.setInstanceAttribute(handle, handle.updater, this.instanceI, value)
     }
-
-    internal fun draw(): Unit { this.shader.draw() } // TODO
 }

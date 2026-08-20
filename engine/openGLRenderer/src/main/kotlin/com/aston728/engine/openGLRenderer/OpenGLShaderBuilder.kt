@@ -5,6 +5,8 @@ import com.aston728.engine.core.types.ErrorHandler
 import org.lwjgl.opengl.GL33C.*
 
 internal class OpenGLShaderBuilder : ShaderBuilder() {
+    private val samplerManager: OpenGLShaderSamplerManager = OpenGLShaderSamplerManager()
+
     private fun getAttributeGLPrimitive(primitive: ShaderAttributePrimitive): Int = when (primitive) {
         ShaderAttributePrimitive.Int -> GL_INT
         ShaderAttributePrimitive.Byte -> GL_BYTE
@@ -47,10 +49,10 @@ internal class OpenGLShaderBuilder : ShaderBuilder() {
         ShaderAttributeType.Mat4x2, ShaderAttributeType.Mat4x3, ShaderAttributeType.Mat4 -> 4
     }
     private fun getUniformTypeName(type: ShaderUniformType): String = when (type) {
-        ShaderUniformType.Int -> "int"
-        ShaderUniformType.IVec2 -> "ivec2"
-        ShaderUniformType.IVec3 -> "ivec3"
-        ShaderUniformType.IVec4 -> "ivec4"
+        ShaderUniformType.Int, ShaderUniformType.Bool -> "int"
+        ShaderUniformType.IVec2, ShaderUniformType.BoolVec2 -> "ivec2"
+        ShaderUniformType.IVec3, ShaderUniformType.BoolVec3 -> "ivec3"
+        ShaderUniformType.IVec4, ShaderUniformType.BoolVec4 -> "ivec4"
         ShaderUniformType.UInt -> "uint"
         ShaderUniformType.UIVec2 -> "uvec2"
         ShaderUniformType.UIVec3 -> "uvec3"
@@ -68,6 +70,8 @@ internal class OpenGLShaderBuilder : ShaderBuilder() {
         ShaderUniformType.Mat4x2, ShaderUniformType.TMat4x2 -> "mat4x2"
         ShaderUniformType.Mat4x3, ShaderUniformType.TMat4x3 -> "mat4x3"
         ShaderUniformType.Mat4, ShaderUniformType.TMat4 -> "mat4"
+        ShaderUniformType.Image2DSampler -> "sampler2D"
+        ShaderUniformType.Image2DArraySampler -> "sampler2DArray"
     }
 
     private fun createVertexSource(
@@ -116,6 +120,7 @@ internal class OpenGLShaderBuilder : ShaderBuilder() {
             }
         """
     }
+
     private fun configure(
         shader: OpenGLShader,
         vertexAttributeBindings: List<OpenGLShaderVertexAttributeBinding>, instanceAttributeBindings: List<OpenGLShaderInstanceAttributeBinding>,
@@ -199,17 +204,21 @@ internal class OpenGLShaderBuilder : ShaderBuilder() {
         }
         val instanceDataStrideSize: Int = instanceAttributeBindings.sumOf { it.handle.primitive.byteSize * it.handle.type.numComponents }
 
+        val uniforms: List<ShaderUniformInfo<*>> = spec.getUniforms()
         if (inputAttributeLocation >= GL_MAX_VERTEX_ATTRIBS) {
             errorCallback("$spec is invalid, there are too many input attributes")
             return null
         }
+        if (uniforms.count { it.handle.type.isSampler } > GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS) {
+            errorCallback("$spec is invalid, there are too many sampled images")
+        }
 
-        val uniformsString: String = spec.getUniforms().joinToString("\n") { "uniform ${this.getUniformTypeName(it.handle.type)} ${it.name}; " }
+        val uniformsString: String = uniforms.joinToString("\n") { "uniform ${this.getUniformTypeName(it.handle.type)} ${it.name}; " }
         val shader: OpenGLShader = OpenGLShader(
             spec.getName(),
             vertexAttributeBindings, vertexDataStrideSize, verticesPerInstance,
             instanceAttributeBindings, instanceDataStrideSize,
-            spec.getUniforms(),
+            uniforms, this.samplerManager,
             this.createVertexSource(spec, vertexAttributeBindings, instanceAttributeBindings, uniformsString),
             this.createFragmentSource(spec, uniformsString),
             errorCallback
@@ -218,5 +227,9 @@ internal class OpenGLShaderBuilder : ShaderBuilder() {
         if (!shader.isValid()) { return null }
         this.configure(shader, vertexAttributeBindings, instanceAttributeBindings)
         return shader
+    }
+
+    internal fun destroy(): Unit {
+        this.samplerManager.destroy()
     }
 }
