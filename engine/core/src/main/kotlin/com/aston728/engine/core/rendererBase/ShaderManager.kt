@@ -1,12 +1,10 @@
 package com.aston728.engine.core.rendererBase
 
-import com.aston728.engine.core.types.ErrorHandler
-
-private data class ShaderRepresentation(private val context: GraphicsContext, val spec: ShaderSpec)
+private data class ShaderRepresentation(val windowHandle: Long, val spec: ShaderSpec)
 
 internal class ShaderManager(
-    private val builder: ShaderBuilder = BlankShaderBuilder(),
-    private val errorCallback: ErrorHandler = { message -> System.err.println("[SHADER] $message") }
+    private val buildShader: (Long, ShaderSpec) -> Shader? = { windowHandle, spec -> BlankShader(spec.getName()) },
+    private val errorCallback: (String) -> Unit = { message -> System.err.println("[SHADER] $message") }
 ) : ShaderProvider {
     private val specCache: MutableMap<String, ShaderSpec> = mutableMapOf()
     private val shaderCache: MutableMap<ShaderRepresentation, Shader> = mutableMapOf()
@@ -17,7 +15,7 @@ internal class ShaderManager(
         return this.specCache.getOrPut(spec.getRepresentation()) { spec }
     }
 
-    override fun acquire(context: GraphicsContext, spec: ShaderSpec): ShaderInstanceHandle? {
+    override fun acquire(windowHandle: Long, spec: ShaderSpec): ShaderInstanceHandle? {
         val specError: String? = spec.checkValidity()
         if (specError != null) {
             this.errorCallback(specError)
@@ -26,8 +24,8 @@ internal class ShaderManager(
         }
 
         spec.freeze()
-        val shader: Shader = this.shaderCache.getOrPut(ShaderRepresentation(context, spec)) {
-            val shader: Shader? = this.builder.build(spec, this.errorCallback)
+        val shader: Shader = this.shaderCache.getOrPut(ShaderRepresentation(windowHandle, spec)) {
+            val shader: Shader? = this.buildShader(windowHandle, spec)
             if (shader == null) {
                 this.specCache.remove(spec.getRepresentation())
                 return null

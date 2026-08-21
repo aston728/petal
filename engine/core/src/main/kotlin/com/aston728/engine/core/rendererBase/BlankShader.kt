@@ -18,5 +18,4 @@ internal class BlankShader(name: String) : Shader(name) {
     override fun <T> setUniform(handle: ShaderUniformHandle<T>, value: T): Unit {}
 
     override fun onDestroy(): Unit {}
-    override fun onDraw(graphicsContext: GraphicsContext): Unit {}
 }

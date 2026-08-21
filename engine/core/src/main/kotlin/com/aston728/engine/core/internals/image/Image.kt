@@ -1,7 +1,6 @@
 package com.aston728.engine.core.internals.image
 
 import com.aston728.engine.core.geometry.IntSize
-import com.aston728.engine.core.types.ErrorHandler
 import org.lwjgl.stb.STBImage.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -21,7 +20,7 @@ public class Image private constructor(private val width: Int, private val heigh
                 ))
                 .rewind()
         )
-        internal fun load(path: String, errorCallback: ErrorHandler): Image {
+        internal fun load(path: String, errorCallback: (String) -> Unit): Image {
             val bytes: ByteArray? = Image::class.java.getResourceAsStream("/$path")?.use { it.readBytes() }
             if (bytes == null) {
                 errorCallback("Failed to open image '$path'")

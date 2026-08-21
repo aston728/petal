@@ -1,6 +1,9 @@
 package com.aston728.engine.vulkanRenderer
 
-import com.aston728.engine.core.rendererBase.*
+import com.aston728.engine.core.rendererBase.Shader
+import com.aston728.engine.core.rendererBase.ShaderInstanceAttributeHandle
+import com.aston728.engine.core.rendererBase.ShaderUniformHandle
+import com.aston728.engine.core.rendererBase.ShaderVertexAttributeHandle
 import java.nio.ByteBuffer
 
 internal class VulkanShader(name: String) : Shader(name) {
@@ -19,5 +22,4 @@ internal class VulkanShader(name: String) : Shader(name) {
     override fun <T> setUniform(handle: ShaderUniformHandle<T>, value: T): Unit {}
 
     override fun onDestroy(): Unit {}
-    override fun onDraw(graphicsContext: GraphicsContext): Unit {}
 }

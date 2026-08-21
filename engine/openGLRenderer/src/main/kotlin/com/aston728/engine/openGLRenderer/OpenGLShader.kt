@@ -2,7 +2,6 @@ package com.aston728.engine.openGLRenderer
 
 import com.aston728.engine.core.math.*
 import com.aston728.engine.core.rendererBase.*
-import com.aston728.engine.core.types.ErrorHandler
 import org.lwjgl.opengl.GL33C.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -16,7 +15,7 @@ internal class OpenGLShader(
     instanceAttributesInfo: List<OpenGLShaderInstanceAttributeBinding>, private val instanceDataStrideSize: Int,
     uniformsInfo: List<ShaderUniformInfo<*>>, private val samplerManager: OpenGLShaderSamplerManager,
     vertexSource: String, fragmentSource: String,
-    private val errorCallback: ErrorHandler,
+    private val errorCallback: (String) -> Unit,
 ) : Shader(name) {
     private companion object {
         private const val INVALID_PROGRAM: Int = -1
@@ -288,7 +287,8 @@ internal class OpenGLShader(
         glDeleteProgram(this.program)
         this.program = OpenGLShader.INVALID_PROGRAM
     }
-    override fun onDraw(graphicsContext: GraphicsContext): Unit { // TODO
+
+    internal fun draw(graphicsContext: OpenGLContext): Unit { // TODO
         glUseProgram(this.program)
         glBindVertexArray(this.vao)
 

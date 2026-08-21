@@ -1,15 +1,13 @@
 package com.aston728.engine.openGLRenderer
 
 import com.aston728.engine.core.geometry.IntSize
-import com.aston728.engine.core.rendererBase.GraphicsContext
-import com.aston728.engine.core.types.ErrorHandler
 import org.lwjgl.glfw.GLFW.glfwMakeContextCurrent
 import org.lwjgl.glfw.GLFW.glfwSwapBuffers
 import org.lwjgl.opengl.*
 import org.lwjgl.opengl.GL43C.*
 import org.lwjgl.system.MemoryUtil.NULL
 
-internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debugMessageCallback: ErrorHandler) : GraphicsContext() {
+internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debugMessageCallback: (String) -> Unit) {
     private val capabilities: GLCapabilities = this.createCapabilities()
     private val textureBindings: IntArray by lazy {
         IntArray(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS - GL_TEXTURE0 - 1) { 0 }
@@ -27,7 +25,6 @@ internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debug
         glfwMakeContextCurrent(this.handle)
         return GL.createCapabilities()
     }
-
     private fun formatDebugMessageNormal(source: Int, type: Int, severity: Int, messageLength: Int, message: Long): String {
         val sourceString: String = when (source) {
             GL_DEBUG_SOURCE_API -> "API"
@@ -109,7 +106,7 @@ internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debug
         val description: String = GLDebugMessageAMDCallback.getMessage(messageLength, message)
         return "Source: $categoryString\nSeverity: $severityString\nMessage: $description"
     }
-    private fun enableDebugging(messageCallback: ErrorHandler): Unit {
+    private fun enableDebugging(messageCallback: (String) -> Unit): Unit {
         if ((glGetInteger(GL_CONTEXT_FLAGS) and GL_CONTEXT_FLAG_DEBUG_BIT) == 0) {
             messageCallback("Failed to set a debug message callback, a debug context is not present")
             return
@@ -151,17 +148,18 @@ internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debug
         }
     }
 
-    override fun onGetHandle(): Long = this.handle
-    override fun onMakeCurrent(): Unit {
+    internal fun getHandle(): Long = this.handle
+
+    internal fun makeCurrent(): Unit {
         glfwMakeContextCurrent(this.handle)
         GL.setCapabilities(this.capabilities)
     }
-    override fun onResize(size: IntSize): Unit {
+    internal fun resize(size: IntSize): Unit {
         glfwMakeContextCurrent(this.handle)
         GL.setCapabilities(this.capabilities)
         glViewport(0, 0, size.width, size.height)
     }
-    override fun bindTexture(unit: Int, texture: Int, textureType: Int, sampler: Int): Unit {
+    internal fun bindTexture(unit: Int, texture: Int, textureType: Int, sampler: Int): Unit {
         if (this.textureBindings[unit] != texture) {
             this.textureBindings[unit] = texture
             glActiveTexture(GL_TEXTURE0 + unit)
@@ -172,7 +170,7 @@ internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debug
             glBindSampler(unit, sampler)
         }
     }
-    override fun onSwapBuffers(): Unit {
+    internal fun swapBuffers(): Unit {
         glfwSwapBuffers(this.handle)
     }
 }

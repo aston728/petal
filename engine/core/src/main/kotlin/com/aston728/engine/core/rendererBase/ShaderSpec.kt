@@ -1,6 +1,5 @@
 package com.aston728.engine.core.rendererBase
 
-import com.aston728.engine.core.types.ErrorHandler
 import com.aston728.engine.core.utils.NamedObject
 
 public class ShaderSpec private constructor(

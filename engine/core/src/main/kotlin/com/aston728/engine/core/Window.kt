@@ -4,18 +4,11 @@ import com.aston728.engine.core.geometry.*
 import com.aston728.engine.core.internals.InternalWindow
 import com.aston728.engine.core.internals.MonitorInfo
 import com.aston728.engine.core.internals.devices.Cursor
-import com.aston728.engine.core.rendererBase.BlankGraphicsContext
-import com.aston728.engine.core.rendererBase.GraphicsContext
-import com.aston728.engine.core.types.ErrorHandler
 import com.aston728.engine.core.utils.Handle
 import com.aston728.engine.core.utils.NamedObject
 import kotlin.reflect.KClass
 
-public class Window internal constructor(
-    private var context: EngineContext, sharedContext: Window?,
-    graphicsContextProvider: (Long, Boolean, ErrorHandler) -> GraphicsContext,
-    debugMessageCallback: ErrorHandler
-) : NamedObject<Window>("Unnamed Window") {
+public class Window internal constructor(private var context: EngineContext, sharedContext: Window?) : NamedObject<Window>("Unnamed Window") {
     private var initialSize: IntSize = IntSize(500, 500)
     private val internalWindow: InternalWindow = this.createInternalWindow(sharedContext)
     private var state: WindowState = if (this.internalWindow.exists()) { WindowState.ALIVE } else { WindowState.NONEXISTING }
@@ -24,10 +17,6 @@ public class Window internal constructor(
     private var topLevelCursor: Cursor? = null
 
     private var ui: UI? = null
-
-    private val graphicsContext: GraphicsContext =
-        if (this.state != WindowState.ALIVE) { BlankGraphicsContext() }
-        else { graphicsContextProvider(this.internalWindow.getHandle(), this.context.isDebugOn, debugMessageCallback) }
 
     private fun createInternalWindow(sharedContext: Window?): InternalWindow {
         val window: InternalWindow = InternalWindow(sharedContext?.getInternalWindow()?.getHandle(), this.context.isDebugOn)
@@ -63,7 +52,6 @@ public class Window internal constructor(
     }
 
     internal fun getInternalWindow(): InternalWindow = this.internalWindow
-    internal fun getGraphicsContext(): GraphicsContext = this.graphicsContext
 
     public fun getState(): WindowState = this.state
     public fun getHandle(): Long? = this.safeGet("handle") { this.internalWindow.getHandle() }
@@ -281,7 +269,9 @@ public class Window internal constructor(
     public fun addToEngine(engine: Engine): Window = this.safeDo("add to engine") {
         engine.addWindow(this)
     }
-    public fun setStructure(ui: UI): Window = this.safeSet("structure") { this.setUI(ui) }
+    public fun setStructure(ui: UI): Window = this.safeSet("structure") {
+        this.setUI(ui)
+    }
 
     public fun reset(): Window = this.safeDo("reset") {
         this.internalWindow.setModes(
@@ -296,26 +286,15 @@ public class Window internal constructor(
         this.internalWindow.onClose()
         this.state = WindowState.NONEXISTING
     }
-    internal fun onMove(position: IntPosition): Unit {
-        this.internalWindow.onMove(position)
-    }
+    internal fun onMove(position: IntPosition): Unit = this.internalWindow.onMove(position)
     internal fun onResize(size: IntSize): Unit {
         this.internalWindow.onResize(size)
-        this.graphicsContext.resize(size)
         this.ui?.onResize()
     }
-    internal fun onMinimize(): Unit {
-        this.internalWindow.onMinimize()
-    }
-    internal fun onUnminimize(): Unit {
-        this.internalWindow.onUnminimize()
-    }
-    internal fun onMaximize(): Unit {
-        this.internalWindow.onMaximize()
-    }
-    internal fun onUnmaximize(): Unit {
-        this.internalWindow.onUnmaximize()
-    }
+    internal fun onMinimize(): Unit = this.internalWindow.onMinimize()
+    internal fun onUnminimize(): Unit = this.internalWindow.onUnminimize()
+    internal fun onMaximize(): Unit = this.internalWindow.onMaximize()
+    internal fun onUnmaximize(): Unit = this.internalWindow.onUnmaximize()
     internal fun onFocus(): Unit {
         this.ui?.onFocus()
     }
@@ -329,6 +308,6 @@ public class Window internal constructor(
             ?.handleDirtyAnchors(rect)
             ?.handleDirtyRelationship()
             ?.handleDirtyLayouts(IntSize(rect.width, rect.height))
-            ?.handleDirtyShaders(this.graphicsContext)
+            ?.handleDirtyShaders(this.internalWindow.getHandle())
     }
 }

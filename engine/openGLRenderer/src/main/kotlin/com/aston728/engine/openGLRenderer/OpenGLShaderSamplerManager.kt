@@ -66,7 +66,7 @@ internal class OpenGLShaderSamplerManager {
         glSampler
     }
 
-    internal fun destroy(): Unit {
+    internal fun free(): Unit {
         this.texture2DMappings.values.forEach { glDeleteTextures(it) }
         this.texture2DMappings.clear()
         this.texture2DArrayMappings.values.forEach { glDeleteTextures(it) }

@@ -1,12 +1,11 @@
 package com.aston728.engine.core.internals
 
-import com.aston728.engine.core.types.ErrorHandler
 import org.lwjgl.glfw.GLFW.glfwGetClipboardString
 import org.lwjgl.glfw.GLFW.glfwSetClipboardString
 
 public class ClipboardService internal constructor(
     private val windowProvider: () -> Long? = { null },
-    private val errorCallback: ErrorHandler = { message -> System.err.println("[CLIPBOARD] $message") }
+    private val errorCallback: (String) -> Unit = { message -> System.err.println("[CLIPBOARD] $message") }
 ) {
     public fun getText(): String? {
         val windowHandle: Long? = this.windowProvider()

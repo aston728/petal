@@ -7,13 +7,12 @@ import com.aston728.engine.core.geometry.IntSize
 import com.aston728.engine.core.internals.devices.DeviceAction
 import com.aston728.engine.core.internals.devices.Key
 import com.aston728.engine.core.internals.devices.MouseButton
-import com.aston728.engine.core.types.EventHandler
 import com.aston728.engine.core.utils.Handle
 import kotlin.reflect.KClass
 
 internal class EventManager : EventSubscriber {
     private val events: ArrayDeque<Event> = ArrayDeque()
-    private val eventMappings: MutableMap<KClass<out Event>, MutableList<EventHandler>> = mutableMapOf()
+    private val eventMappings: MutableMap<KClass<out Event>, MutableList<(Event) -> Unit>> = mutableMapOf()
 
     private fun handleWindowMinimizeChangeEvent(window: Window, isMinimized: Boolean): Unit {
         if (isMinimized) { this.addEvent(WindowMinimizeEvent(window)) }
@@ -109,9 +108,9 @@ internal class EventManager : EventSubscriber {
     }
 
     override fun <T : Event> subscribe(event: KClass<T>, handler: (T) -> Unit, handle: Handle?): EventManager = apply {
-        val handlers: MutableList<EventHandler> = this.eventMappings.getOrPut(event) { mutableListOf() }
+        val handlers: MutableList<(Event) -> Unit> = this.eventMappings.getOrPut(event) { mutableListOf() }
         @Suppress("unchecked_cast")
-        val wrapper: EventHandler = { event -> handler(event as T) }
+        val wrapper: (Event) -> Unit = { event -> handler(event as T) }
 
         handlers.add(wrapper)
         handle?.setOnRemoveHandler { handlers.remove(wrapper) }

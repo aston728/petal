@@ -18,7 +18,6 @@ public abstract class Shader(name: String) : NamedObject<Shader>(name) {
     ): Unit
     public abstract fun <T> setUniform(handle: ShaderUniformHandle<T>, value: T): Unit
     protected abstract fun onDestroy(): Unit
-    protected abstract fun onDraw(graphicsContext: GraphicsContext): Unit
 
     internal fun addInstance(): Unit = this.onAddInstance()
     internal fun removeInstance(i: Int): Unit = this.onRemoveInstance(i)
@@ -31,5 +30,4 @@ public abstract class Shader(name: String) : NamedObject<Shader>(name) {
         value: T
     ): Unit = this.onSetInstanceAttribute(handle, updater, instanceI, value)
     internal fun destroy(): Unit = this.onDestroy()
-    internal fun draw(graphicsContext: GraphicsContext): Unit = this.onDraw(graphicsContext)
 }

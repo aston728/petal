@@ -1,12 +1,9 @@
 package com.aston728.engine.openGLRenderer
 
 import com.aston728.engine.core.rendererBase.*
-import com.aston728.engine.core.types.ErrorHandler
 import org.lwjgl.opengl.GL33C.*
 
-internal class OpenGLShaderBuilder : ShaderBuilder() {
-    private val samplerManager: OpenGLShaderSamplerManager = OpenGLShaderSamplerManager()
-
+internal class OpenGLShaderBuilder {
     private fun getAttributeGLPrimitive(primitive: ShaderAttributePrimitive): Int = when (primitive) {
         ShaderAttributePrimitive.Int -> GL_INT
         ShaderAttributePrimitive.Byte -> GL_BYTE
@@ -176,7 +173,7 @@ internal class OpenGLShaderBuilder : ShaderBuilder() {
             }
         }
     }
-    override fun onBuild(spec: ShaderSpec, errorCallback: ErrorHandler): Shader? {
+    internal fun build(spec: ShaderSpec, samplerManager: OpenGLShaderSamplerManager, errorCallback: (String) -> Unit): Shader? {
         var inputAttributeLocation: Int = 0
 
         var vertexAttributeLocation: Int = 0
@@ -218,7 +215,7 @@ internal class OpenGLShaderBuilder : ShaderBuilder() {
             spec.getName(),
             vertexAttributeBindings, vertexDataStrideSize, verticesPerInstance,
             instanceAttributeBindings, instanceDataStrideSize,
-            uniforms, this.samplerManager,
+            uniforms, samplerManager,
             this.createVertexSource(spec, vertexAttributeBindings, instanceAttributeBindings, uniformsString),
             this.createFragmentSource(spec, uniformsString),
             errorCallback
@@ -227,9 +224,5 @@ internal class OpenGLShaderBuilder : ShaderBuilder() {
         if (!shader.isValid()) { return null }
         this.configure(shader, vertexAttributeBindings, instanceAttributeBindings)
         return shader
-    }
-
-    internal fun destroy(): Unit {
-        this.samplerManager.destroy()
     }
 }

@@ -1,16 +1,13 @@
 package com.aston728.engine.core
 
-import com.aston728.engine.core.types.LoggerFormatHandler
-import com.aston728.engine.core.types.LoggerHandler
-
 public class LoggerFatalError : RuntimeException()
 public class Logger : FrozenLogger {
     private var shouldShowInfo: Boolean = true
     private var shouldShowWarnings: Boolean = true
     private var shouldShowErrors: Boolean = true
 
-    private var format: LoggerFormatHandler = { severity: String, tag: String, message: String -> "[$tag] $severity: $message" }
-    private var log: LoggerHandler = { message -> System.err.println(message) }
+    private var format: (String, String, String) -> String = { severity: String, tag: String, message: String -> "[$tag] $severity: $message" }
+    private var log: (String) -> Unit = { message -> System.err.println(message) }
 
     override fun areInfoEnabled(): Boolean = this.shouldShowInfo
     override fun areWarningsEnabled(): Boolean = this.shouldShowWarnings
@@ -25,10 +22,10 @@ public class Logger : FrozenLogger {
     public fun setShowErrors(shouldShowErrors: Boolean): Logger = apply {
         this.shouldShowErrors = shouldShowErrors
     }
-    public fun setFormat(format: LoggerFormatHandler): Logger = apply {
+    public fun setFormat(format: (String, String, String) -> String): Logger = apply {
         this.format = format
     }
-    public fun setHandler(handler: LoggerHandler): Logger = apply {
+    public fun setHandler(handler: (String) -> Unit): Logger = apply {
         this.log = handler
     }
 
