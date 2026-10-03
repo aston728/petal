@@ -1,4 +1,4 @@
-package com.aston728.engine.core.internals.image
+package com.aston728.engine.core.internals
 
 import com.aston728.engine.core.geometry.IntSize
 import org.lwjgl.stb.STBImage.*

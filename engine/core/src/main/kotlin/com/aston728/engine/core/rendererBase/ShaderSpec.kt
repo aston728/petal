@@ -3,22 +3,21 @@ package com.aston728.engine.core.rendererBase
 import com.aston728.engine.core.utils.NamedObject
 
 public class ShaderSpec private constructor(
-    private var vertexAttributes: MutableList<ShaderVertexAttributeInfo<*>>,
-    private var instanceAttributes: MutableList<ShaderInstanceAttributeInfo<*>>,
+    private var vertexAttributes: MutableList<ShaderVertexAttributeHandle<*>>,
+    private var instanceAttributes: MutableList<ShaderInstanceAttributeHandle<*>>,
     private var intermediateAttributes: MutableList<ShaderAttributeInfo>, private var outputAttributes: MutableList<ShaderAttributeInfo>,
     private var uniforms: MutableList<ShaderUniformInfo<*>>,
     private var vertexShaderBody: String, private var vertexShaderFooter: String,
     private var fragmentShaderBody: String, private var fragmentShaderFooter: String,
 ) : NamedObject<ShaderSpec>("Unnamed Shader") {
-    private var isFrozen: Boolean = false
     public constructor() : this(mutableListOf(), mutableListOf(), mutableListOf(), mutableListOf(), mutableListOf(), "", "", "", "")
 
     public companion object {
         public fun merge(vararg specs: ShaderSpec): ShaderSpec {
-            val vertexAttributes: MutableList<ShaderVertexAttributeInfo<*>> = mutableListOf<ShaderVertexAttributeInfo<*>>().apply {
+            val vertexAttributes: MutableList<ShaderVertexAttributeHandle<*>> = mutableListOf<ShaderVertexAttributeHandle<*>>().apply {
                 specs.forEach { this.addAll(it.getVertexAttributesUnsafe()) }
             }
-            val instanceAttributes: MutableList<ShaderInstanceAttributeInfo<*>> = mutableListOf<ShaderInstanceAttributeInfo<*>>().apply {
+            val instanceAttributes: MutableList<ShaderInstanceAttributeHandle<*>> = mutableListOf<ShaderInstanceAttributeHandle<*>>().apply {
                 specs.forEach { this.addAll(it.getInstanceAttributesUnsafe()) }
             }
             val intermediateAttributes: MutableList<ShaderAttributeInfo> = mutableListOf<ShaderAttributeInfo>().apply {
@@ -47,24 +46,14 @@ public class ShaderSpec private constructor(
         }
     }
 
-    private fun doIfUnfrozen(actionDescription: String, block: () -> Unit): ShaderSpec {
-        require(!this.isFrozen) { "$this is frozen, cannot $actionDescription" }
-        block()
-        return this
-    }
-
-    internal fun freeze(): Unit {
-        this.isFrozen = true
-    }
-
-    internal fun getVertexAttributesUnsafe(): List<ShaderVertexAttributeInfo<*>> = this.vertexAttributes
-    internal fun getInstanceAttributesUnsafe(): List<ShaderInstanceAttributeInfo<*>> = this.instanceAttributes
+    internal fun getVertexAttributesUnsafe(): List<ShaderVertexAttributeHandle<*>> = this.vertexAttributes
+    internal fun getInstanceAttributesUnsafe(): List<ShaderInstanceAttributeHandle<*>> = this.instanceAttributes
     internal fun getIntermediateAttributesUnsafe(): List<ShaderAttributeInfo> = this.intermediateAttributes
     internal fun getOutputAttributesUnsafe(): List<ShaderAttributeInfo> = this.outputAttributes
     internal fun getUniformsUnsafe(): List<ShaderUniformInfo<*>> = this.uniforms
 
-    public fun getVertexAttributes(): List<ShaderVertexAttributeInfo<*>> = this.vertexAttributes.toList()
-    public fun getInstanceAttributes(): List<ShaderInstanceAttributeInfo<*>> = this.instanceAttributes.toList()
+    public fun getVertexAttributes(): List<ShaderVertexAttributeHandle<*>> = this.vertexAttributes.toList()
+    public fun getInstanceAttributes(): List<ShaderInstanceAttributeHandle<*>> = this.instanceAttributes.toList()
     public fun getIntermediateAttributes(): List<ShaderAttributeInfo> = this.intermediateAttributes.toList()
     public fun getOutputAttributes(): List<ShaderAttributeInfo> = this.outputAttributes.toList()
     public fun getUniforms(): List<ShaderUniformInfo<*>> = this.uniforms.toList()
@@ -84,19 +73,19 @@ public class ShaderSpec private constructor(
         val vertexAttributeHandlesSeen: HashSet<ShaderVertexAttributeHandle<*>> = HashSet()
         this.vertexAttributes.forEach {
             if (!inputAttributeNamesSeen.add(it.name)) {
-                return "$this is invalid, there are multiple input attributes with the name '${it.name}'"
+                return "$this is invalid, there are multiple input attributes with the name $it"
             }
-            if (!vertexAttributeHandlesSeen.add(it.handle)) {
-                return "$this is invalid, there are multiple vertex attributes with the same handle"
+            if (!vertexAttributeHandlesSeen.add(it)) {
+                return "$this is invalid, there are multiple vertex attributes with the handle $it"
             }
         }
         val instanceAttributeHandlesSeen: HashSet<ShaderInstanceAttributeHandle<*>> = HashSet()
         this.instanceAttributes.forEach {
             if (!inputAttributeNamesSeen.add(it.name)) {
-                return "$this is invalid, there are multiple input attributes with the name '${it.name}'"
+                return "$this is invalid, there are multiple input attributes with the name $it"
             }
-            if (!instanceAttributeHandlesSeen.add(it.handle)) {
-                return "$this is invalid, there are multiple instance attributes with the same handle"
+            if (!instanceAttributeHandlesSeen.add(it)) {
+                return "$this is invalid, there are multiple instance attributes with the handle $it"
             }
         }
 
@@ -117,42 +106,42 @@ public class ShaderSpec private constructor(
         val uniformNamesSeen: HashSet<String> = HashSet()
         val uniformHandlesSeen: HashSet<ShaderUniformHandle<*>> = HashSet()
         this.uniforms.forEach {
-            if (!uniformNamesSeen.add(it.name)) {
-                return "$this is invalid, there are multiple uniforms with the name '${it.name}'"
+            if (!uniformNamesSeen.add(it.handle.name)) {
+                return "$this is invalid, there are multiple uniforms with the name ${it.handle}"
             }
             if (!uniformHandlesSeen.add(it.handle)) {
-                return "$this is invalid, there are multiple uniforms with the same handle"
+                return "$this is invalid, there are multiple uniforms with the handle ${it.handle}"
             }
         }
 
         return null
     }
 
-    public fun <T> addVertexAttribute(name: String, handle: ShaderVertexAttributeHandle<T>): ShaderSpec = this.doIfUnfrozen("add vertex attribute") {
-        this.vertexAttributes.add(ShaderVertexAttributeInfo(name, handle))
+    public fun <T> addVertexAttribute(handle: ShaderVertexAttributeHandle<T>): ShaderSpec = apply {
+        this.vertexAttributes.add(handle)
     }
-    public fun <T> addInstanceAttribute(name: String, handle: ShaderInstanceAttributeHandle<T>): ShaderSpec = this.doIfUnfrozen("add instance attribute") {
-        this.instanceAttributes.add(ShaderInstanceAttributeInfo(name, handle))
+    public fun <T> addInstanceAttribute(handle: ShaderInstanceAttributeHandle<T>): ShaderSpec = apply {
+        this.instanceAttributes.add(handle)
     }
-    public fun addIntermediateAttribute(name: String, type: ShaderAttributeType): ShaderSpec = this.doIfUnfrozen("add intermediate attribute") {
+    public fun addIntermediateAttribute(name: String, type: ShaderAttributeType): ShaderSpec = apply {
         this.intermediateAttributes.add(ShaderAttributeInfo(name, type))
     }
-    public fun addOutputAttribute(name: String, type: ShaderAttributeType): ShaderSpec = this.doIfUnfrozen("add output attribute") {
+    public fun addOutputAttribute(name: String, type: ShaderAttributeType): ShaderSpec = apply {
         this.outputAttributes.add(ShaderAttributeInfo(name, type))
     }
-    public fun <T> addUniform(name: String, handle: ShaderUniformHandle<T>, defaultValue: T): ShaderSpec = this.doIfUnfrozen("add uniform") {
-        this.uniforms.add(ShaderUniformInfo(name, handle, defaultValue))
+    public fun <T> addUniform(handle: ShaderUniformHandle<T>, defaultValue: T): ShaderSpec = apply {
+        this.uniforms.add(ShaderUniformInfo(handle, defaultValue))
     }
-    public fun setVertexShaderBody(body: String): ShaderSpec = this.doIfUnfrozen("set vertex body") {
+    public fun setVertexShaderBody(body: String): ShaderSpec = apply {
         this.vertexShaderBody = body
     }
-    public fun addVertexFooter(footer: String): ShaderSpec = this.doIfUnfrozen("set vertex footer") {
+    public fun addVertexFooter(footer: String): ShaderSpec = apply {
         this.vertexShaderFooter = footer
     }
-    public fun setFragmentShaderBody(body: String): ShaderSpec = this.doIfUnfrozen("set fragment body") {
+    public fun setFragmentShaderBody(body: String): ShaderSpec = apply {
         this.fragmentShaderBody = body
     }
-    public fun addFragmentFooter(footer: String): ShaderSpec = this.doIfUnfrozen("set fragment footer") {
+    public fun addFragmentFooter(footer: String): ShaderSpec = apply {
         this.fragmentShaderFooter = footer
     }
 }

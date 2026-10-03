@@ -54,7 +54,7 @@ private fun floatToHalf(float: Float): UShort {
 @JvmInline
 public value class Half private constructor(public val bits: UShort) {
     public companion object {
-        public val NaN: Half = Half(0x7e00u)
+        public val NAN: Half = Half(0x7e00u)
         public val POSITIVE_INFINITY: Half = Half(0x7c00u)
         public val NEGATIVE_INFINITY: Half = Half(0xfc00u)
 

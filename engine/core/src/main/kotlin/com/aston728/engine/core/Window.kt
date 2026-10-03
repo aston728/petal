@@ -1,16 +1,21 @@
 package com.aston728.engine.core
 
 import com.aston728.engine.core.geometry.*
+import com.aston728.engine.core.internals.Image
 import com.aston728.engine.core.internals.InternalWindow
 import com.aston728.engine.core.internals.MonitorInfo
 import com.aston728.engine.core.internals.devices.Cursor
+import com.aston728.engine.core.rendererBase.ShaderInstanceHandle
+import com.aston728.engine.core.rendererBase.ShaderSpec
 import com.aston728.engine.core.utils.Handle
 import com.aston728.engine.core.utils.NamedObject
 import kotlin.reflect.KClass
 
-public class Window internal constructor(private var context: EngineContext, sharedContext: Window?) : NamedObject<Window>("Unnamed Window") {
+public enum class WindowState { ALIVE, CLOSING, NONEXISTING }
+
+public class Window internal constructor(private var context: EngineContext) : NamedObject<Window>("Unnamed Window") {
     private var initialSize: IntSize = IntSize(500, 500)
-    private val internalWindow: InternalWindow = this.createInternalWindow(sharedContext)
+    private val internalWindow: InternalWindow = this.createInternalWindow()
     private var state: WindowState = if (this.internalWindow.exists()) { WindowState.ALIVE } else { WindowState.NONEXISTING }
 
     private var defaultCursor: Cursor = Cursor.ARROW
@@ -18,12 +23,11 @@ public class Window internal constructor(private var context: EngineContext, sha
 
     private var ui: UI? = null
 
-    private fun createInternalWindow(sharedContext: Window?): InternalWindow {
-        val window: InternalWindow = InternalWindow(sharedContext?.getInternalWindow()?.getHandle(), this.context.isDebugOn)
+    private fun createInternalWindow(): InternalWindow {
+        val window: InternalWindow = InternalWindow(this.context.isDebugOn)
         if (window.exists()) {
-            window
-                .setTitle("Untitled Window")
-                .setSize(this.initialSize)
+            window.setTitle("Untitled Window")
+            window.setSize(this.initialSize)
         }
         return window
     }
@@ -97,26 +101,32 @@ public class Window internal constructor(private var context: EngineContext, sha
     public fun getTopLevelCursor(): Cursor? = this.safeGet("top level cursor") { this.topLevelCursor }
     public fun getUI(): UI? = this.safeGet("UI") { this.ui }
 
-    internal fun show(): Window = apply {
+    internal fun show(): Unit {
         this.internalWindow.show()
     }
-    internal fun hide(): Window = apply {
+    internal fun hide(): Unit {
         this.internalWindow.hide()
     }
-    internal fun focus(): Window = apply {
+    internal fun focus(): Unit {
         this.internalWindow.focus()
     }
-    internal fun startClosing(): Window = apply {
+    internal fun startClosing(): Unit {
         this.internalWindow.hide()
         this.state = WindowState.CLOSING
     }
-    internal fun setCursor(cursor: Cursor?): Window = apply {
+    internal fun setCursor(cursor: Cursor?): Unit {
         val cursor: Cursor = this.topLevelCursor ?: cursor ?: this.defaultCursor
         if (cursor != this.internalWindow.getCursor()) { this.internalWindow.setCursor(cursor) }
     }
 
     public fun setTitle(title: String): Window = this.safeSet("title") {
         this.internalWindow.setTitle(title)
+    }
+    public fun setIcon(icon: Image?): Window = this.safeSet("icon") {
+        this.internalWindow.setIcon(icon)
+    }
+    public fun setIcon(icons: List<Image>): Window = this.safeSet("icons") {
+        this.internalWindow.setIcon(icons)
     }
     public fun setPosition(position: IntPosition, monitorI: Int? = null): Window = this.safeSet("position") {
         val monitorInfo: MonitorInfo? =
@@ -263,8 +273,8 @@ public class Window internal constructor(private var context: EngineContext, sha
         }
     }
     public fun setUI(ui: UI?): Window = this.safeSet("UI") {
-        this.ui = ui?.attachContext(this.context)
-        this.ui?.onWindowAttach()
+        this.ui = ui
+        this.ui?.attachContext(this.context)
     }
     public fun addToEngine(engine: Engine): Window = this.safeDo("add to engine") {
         engine.addWindow(this)
@@ -302,12 +312,15 @@ public class Window internal constructor(private var context: EngineContext, sha
         this.ui?.onUnfocus()
     }
 
-    internal fun handleUIDirtyFlags(): Window = apply {
+    internal fun handleUIDirtyFlags(
+        acquireInstanceHandle: (ShaderSpec) -> ShaderInstanceHandle?,
+        releaseInstanceHandle: (ShaderInstanceHandle) -> Unit
+    ): Unit {
         val rect: Rect = Rect(IntPosition(0, 0), this.internalWindow.getSize())
         this.ui
             ?.handleDirtyAnchors(rect)
             ?.handleDirtyRelationship()
             ?.handleDirtyLayouts(IntSize(rect.width, rect.height))
-            ?.handleDirtyShaders(this.internalWindow.getHandle())
+            ?.handleDirtyShaders(acquireInstanceHandle, releaseInstanceHandle)
     }
 }

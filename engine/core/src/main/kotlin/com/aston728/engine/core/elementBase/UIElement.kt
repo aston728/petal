@@ -8,13 +8,15 @@ import com.aston728.engine.core.elementBase.layout.AnchoredPosition
 import com.aston728.engine.core.elementBase.layout.SizeReference
 import com.aston728.engine.core.geometry.*
 import com.aston728.engine.core.internals.devices.Cursor
-import com.aston728.engine.core.internals.image.Image
 import com.aston728.engine.core.rendererBase.*
+import com.aston728.engine.core.utils.Handle
 import com.aston728.engine.core.utils.NamedObject
 
 public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>(name) {
     private companion object {
-        private val DEFAULT_SHADER_HANDLE: ShaderInstanceHandle = ShaderInstanceHandle(BlankShader("Element Shader"), 0)
+        private val BLANK_SHADER_SPEC: ShaderSpec = ShaderSpec()
+        private val BLANK_SHADER_ATTRIBUTES_DATA: List<ShaderData> = emptyList()
+        private val PLACEHOLDER_SHADER_HANDLE: ShaderInstanceHandle = ShaderInstanceHandle(BlankShader("Element Shader"), 0, errorCallback = {})
     }
 
     protected var _context: EngineContext = defaultEngineContext
@@ -29,9 +31,9 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     protected val _rect: Rect = Rect()
     private var layer: Double = 0.0
 
-    private var shaderSpec: ShaderSpec = ShaderSpec()
-    private var shaderData: List<ShaderData> = emptyList()
-    protected var _shaderInstanceHandle: ShaderInstanceHandle = UIElement.DEFAULT_SHADER_HANDLE
+    private var shaderSpec: ShaderSpec = UIElement.BLANK_SHADER_SPEC
+    private var shaderAttributesData: List<ShaderData> = UIElement.BLANK_SHADER_ATTRIBUTES_DATA
+    protected var _shaderInstanceHandle: ShaderInstanceHandle = UIElement.PLACEHOLDER_SHADER_HANDLE
         private set
 
     private var parent: UIElement<*>? = null
@@ -40,6 +42,12 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     private var isVisible: Boolean = true
     private var sizeReference: SizeReference = SizeReference.PARENT
     private var dirtyFlags: DirtyFlags = DirtyFlags.none()
+
+    private var shaderChangeHandlers: MutableList<(ShaderInstanceHandle, ShaderInstanceHandle) -> Unit> = mutableListOf()
+
+    init {
+        this.setToDefaultShader()
+    }
 
     internal fun getRectUnsafe(): Rect = this._rect
     internal fun getPositionUnsafe(): AnchoredPosition = this.anchoredPosition
@@ -55,12 +63,14 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     public fun isVisible(): Boolean = this.isVisible
     public fun getSizeReference(): SizeReference = this.sizeReference
 
-    internal fun addDirtyFlag(flag: DirtyFlags): T = this.self {
+    internal fun addDirtyFlag(flag: DirtyFlags): Unit {
         this.dirtyFlags += flag
     }
 
     public fun setPosition(anchor: Anchor, coordinate: Coordinate, offset: IntOffset): T = this.self {
-        this.anchoredPosition.setAnchor(anchor).setCoordinate(coordinate).setOffset(offset)
+        this.anchoredPosition.setAnchor(anchor)
+        this.anchoredPosition.setCoordinate(coordinate)
+        this.anchoredPosition.setOffset(offset)
         this.dirtyFlags += DirtyFlags.ANCHOR + DirtyFlags.POSITION
     }
     public fun setPositionOffset(offset: IntOffset): T = this.self {
@@ -78,8 +88,8 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
         this.layer = layer
     }
     public open fun setShader(vararg specs: ShaderSpec, data: List<ShaderData> = emptyList()): T = this.self {
-        this.shaderSpec = this._context.shaderProvider.specGetOrMerge(*specs)
-        this.shaderData = data
+        this.shaderSpec = ShaderSpec.merge(*specs)
+        this.shaderAttributesData = data
         this.dirtyFlags += DirtyFlags.SHADER
     }
     public fun setToDefaultShader(): T = this.self {
@@ -96,8 +106,13 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
         this.isVisible = isVisible
     }
     public fun toggleVisibility(): T = this.setVisible(!this.isVisible)
+    public fun addShaderChangeHandler(handler: (ShaderInstanceHandle, ShaderInstanceHandle) -> Unit, handle: Handle? = null): Unit {
+        val wrapper: (ShaderInstanceHandle, ShaderInstanceHandle) -> Unit = { previousInstance, newInstance -> handler(previousInstance, newInstance) }
+        this.shaderChangeHandlers.add(wrapper)
+        handle?.setOnRemoveHandler { this.shaderChangeHandlers.remove(wrapper) }
+    }
 
-    internal fun attachContext(context: EngineContext): T = this.self {
+    internal fun attachContext(context: EngineContext): Unit {
         this._context = context
     }
     public fun addToUI(ui: UI): T = this.self {
@@ -129,22 +144,6 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     protected open fun onResize(fullSize: IntSize): Unit {
         this.dirtyFlags -= DirtyFlags.SIZE
     }
-    protected open fun onCommitShaderChange(windowHandle: Long): Unit {
-        var instanceHandle: ShaderInstanceHandle? = this._context.shaderProvider.acquire(windowHandle, this.shaderSpec)
-        if (instanceHandle == null && this._shaderInstanceHandle.shader is BlankShader) {
-            this.setToDefaultShader()
-            instanceHandle = this._context.shaderProvider.acquire(windowHandle, this.shaderSpec)
-            this.shaderData = emptyList()
-        }
-
-        if (instanceHandle != null) {
-            this._context.shaderProvider.release(this._shaderInstanceHandle)
-            this._shaderInstanceHandle = instanceHandle
-            this.shaderData.forEach { it.applyTo(this._shaderInstanceHandle) }
-        }
-        this.dirtyFlags -= DirtyFlags.SHADER
-    }
-    protected open fun computeDrawSequence(hoveredElement: UIElement<*>?): List<Pair<Image, IntPosition>> = emptyList()
     protected open fun onUpdate(hoveredElement: UIElement<*>?): Unit {}
 
     internal fun commitAnchorChange(): Unit = this.onCommitAnchorChange()
@@ -153,7 +152,27 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     internal fun discardParentChange(): Unit = this.onDiscardParentChange()
     internal fun reposition(): Unit =  this.onReposition()
     internal fun resize(fullSize: IntSize): Unit = this.onResize(fullSize)
-    internal fun commitShaderChange(windowHandle: Long): Unit = this.onCommitShaderChange(windowHandle)
-    internal fun getDrawSequence(hoveredElement: UIElement<*>?): List<Pair<Image, IntPosition>> = this.computeDrawSequence(hoveredElement)
+    internal fun commitShaderChange(
+        acquireInstanceHandle: (ShaderSpec) -> ShaderInstanceHandle?,
+        releaseInstanceHandle: (ShaderInstanceHandle) -> Unit
+    ): Unit {
+        var instanceHandle: ShaderInstanceHandle? = acquireInstanceHandle(this.shaderSpec)
+        if (instanceHandle == null && this._shaderInstanceHandle == UIElement.PLACEHOLDER_SHADER_HANDLE) {
+            this.setToDefaultShader()
+            instanceHandle = acquireInstanceHandle(this.shaderSpec)
+        }
+
+        if (instanceHandle != null) {
+            val previousHandle: ShaderInstanceHandle = this._shaderInstanceHandle
+            releaseInstanceHandle(previousHandle)
+
+            this._shaderInstanceHandle = instanceHandle.setName("ShaderInstanceHandle($this,${instanceHandle.shader})")
+            this.shaderAttributesData.forEach { it.applyTo(this._shaderInstanceHandle) }
+            this.shaderChangeHandlers.toList().forEach { it(previousHandle, this._shaderInstanceHandle) }
+        }
+        this.shaderSpec = UIElement.BLANK_SHADER_SPEC
+        this.shaderAttributesData = UIElement.BLANK_SHADER_ATTRIBUTES_DATA
+        this.dirtyFlags -= DirtyFlags.SHADER
+    }
     internal fun update(hoveredElement: UIElement<*>?): Unit = this.onUpdate(hoveredElement)
 }

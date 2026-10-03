@@ -7,66 +7,80 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 private fun boolToInt(bool: Boolean): Int = if (bool) { 1 } else { 0 }
-private class OpenGLShaderAttributeData(val name: String, val location: Int)
+private class BufferRange(val start: Int, val end: Int)
+private class OpenGLShaderTextureBinding(var texture: Int, var type: Int, var sampler: Int)
 
 internal class OpenGLShader(
     name: String,
-    vertexAttributesInfo: List<OpenGLShaderVertexAttributeBinding>, private val vertexDataStrideSize: Int, private val verticesPerInstance: Int,
-    instanceAttributesInfo: List<OpenGLShaderInstanceAttributeBinding>, private val instanceDataStrideSize: Int,
+    internal val vertexAttributes: List<ShaderVertexAttributeHandle<*>>, internal val instanceAttributes: List<ShaderInstanceAttributeHandle<*>>,
     uniformsInfo: List<ShaderUniformInfo<*>>, private val samplerManager: OpenGLShaderSamplerManager,
     vertexSource: String, fragmentSource: String,
+    private val contextProvider: () -> OpenGLContext, private val stateProvider: (OpenGLContext, OpenGLShader) -> OpenGLShaderState,
     private val errorCallback: (String) -> Unit,
 ) : Shader(name) {
-    private companion object {
+    companion object {
         private const val INVALID_PROGRAM: Int = -1
     }
 
     private var vertexData: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
+    internal val vertexDataStrideSize: Int = this.vertexAttributes.sumOf { it.primitive.byteSize * it.type.numComponents }
+    private val verticesPerInstance: Int = 4
+
     private var instanceData: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
-    private var isVertexDataDirty: Boolean = false
-    private var isInstanceDataDirty: Boolean = false
+    internal val instanceDataStrideSize: Int = this.instanceAttributes.sumOf { it.primitive.byteSize * it.type.numComponents }
+
+    private var dataFreeSlots: MutableList<Int> = mutableListOf()
+    private var vertexDataDirtyRanges: MutableList<BufferRange> = mutableListOf()
+    private var instanceDataDirtyRanges: MutableList<BufferRange> = mutableListOf()
     private val uniformUpdatesQueue: MutableList<() -> Unit> = mutableListOf()
 
-    private val vao: Int = glGenVertexArrays()
-    private val vertexBuffer: Int = glGenBuffers()
-    private val instanceBuffer: Int = glGenBuffers()
-    private val ebo: Int = glGenBuffers()
-    private var program: Int = this.createProgram(vertexSource, fragmentSource)
+    internal val vertexBuffer: Int = glGenBuffers()
+    internal val instanceBuffer: Int = glGenBuffers()
+    internal val ebo: Int = this.createEbo()
+    internal var program: Int = this.createProgram(vertexSource, fragmentSource)
 
-    private val vertexAttributeMappings: Map<ShaderVertexAttributeHandle<*>, OpenGLShaderAttributeData> by lazy {
-        vertexAttributesInfo.associate { it.handle to OpenGLShaderAttributeData(it.name, it.bufferLocation) }
+    var vertexAttributeLocation: Int = 0
+    private val vertexAttributeMappings: Map<ShaderVertexAttributeHandle<*>, Int> = this.vertexAttributes.associateWith {
+        val location: Int = vertexAttributeLocation
+        vertexAttributeLocation += it.primitive.byteSize * it.type.numComponents
+        location
     }
-    private val instanceAttributeMappings: Map<ShaderInstanceAttributeHandle<*>, OpenGLShaderAttributeData> by lazy {
-        instanceAttributesInfo.associate { it.handle to OpenGLShaderAttributeData(it.name, it.bufferLocation) }
+    var instanceAttributeLocation: Int = 0
+    private val instanceAttributeMappings: Map<ShaderInstanceAttributeHandle<*>, Int> = this.instanceAttributes.associateWith {
+        val location: Int = instanceAttributeLocation
+        instanceAttributeLocation += it.primitive.byteSize * it.type.numComponents
+        location
     }
-    private val uniformMappings: Map<ShaderUniformHandle<*>, OpenGLShaderAttributeData> =
-        if (this.isValid()) {
-            uniformsInfo.associate { it.handle to OpenGLShaderAttributeData(it.name, glGetUniformLocation(this.program, it.name)) }
+
+    private val uniformMappings: Map<ShaderUniformHandle<*>, Int> =
+        if (this.exists()) {
+            uniformsInfo.associate { it.handle to glGetUniformLocation(this.program, it.handle.name) }
         } else {
             emptyMap()
         }
-
     private val textureUnitMappings: Map<ShaderUniformHandle<*>, Int> by lazy { buildMap {
         uniformsInfo.forEachIndexed { i, info ->
             if (info.handle.type.isSampler) { this[info.handle] = i }
         }
     }}
-    private val textureBindings: IntArray by lazy {
-        IntArray(this.textureUnitMappings.size) { 0 }
-    }
-    private val textureTypeBindings: IntArray by lazy {
-        IntArray(this.textureUnitMappings.size) { 0 }
-    }
-    private val samplerBindings: IntArray by lazy {
-        IntArray(this.textureUnitMappings.size) { 0 }
+    private val textureBindings: Array<OpenGLShaderTextureBinding> by lazy {
+        Array(this.textureUnitMappings.size) { OpenGLShaderTextureBinding(0, 0, 0) }
     }
 
+    override fun exists(): Boolean = this.program != OpenGLShader.INVALID_PROGRAM
+
+    private fun createEbo(): Int {
+        val ebo: Int = glGenBuffers()
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, intArrayOf(0, 1, 2, 1, 2, 3), GL_STATIC_DRAW)
+        return ebo
+    }
     private fun createProgram(vertexSource: String, fragmentSource: String): Int {
         val vertexShader: Int = glCreateShader(GL_VERTEX_SHADER)
         glShaderSource(vertexShader, vertexSource)
         glCompileShader(vertexShader)
         val vertexShaderError: String = glGetShaderInfoLog(vertexShader)
-        if (!vertexShaderError.isEmpty()) { // Exit on warning too
+        if (vertexShaderError.isNotEmpty()) { // Exit on warning too
             this.errorCallback("Failed to create vertex shader for $this: $vertexShaderError")
 
             glDeleteShader(vertexShader)
@@ -77,7 +91,7 @@ internal class OpenGLShader(
         glShaderSource(fragmentShader, fragmentSource)
         glCompileShader(fragmentShader)
         val fragmentShaderError: String = glGetShaderInfoLog(fragmentShader)
-        if (!fragmentShaderError.isEmpty()) { // Exit on warning too
+        if (fragmentShaderError.isNotEmpty()) { // Exit on warning too
             this.errorCallback("Failed to create fragment shader for $this: $fragmentShaderError")
 
             glDeleteShader(vertexShader)
@@ -90,7 +104,7 @@ internal class OpenGLShader(
         glAttachShader(program, fragmentShader)
         glLinkProgram(program)
         val programError: String = glGetProgramInfoLog(program)
-        if (!programError.isEmpty()) { // Exit on warning too
+        if (programError.isNotEmpty()) { // Exit on warning too
             this.errorCallback("Failed to create program for $this: $programError")
 
             glDeleteShader(vertexShader)
@@ -101,97 +115,68 @@ internal class OpenGLShader(
 
         glDeleteShader(vertexShader)
         glDeleteShader(fragmentShader)
-
-        glUseProgram(this.program)
-        glBindVertexArray(this.vao)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this.ebo)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, intArrayOf(0, 1, 2, 1, 2, 3), GL_STATIC_DRAW)
-
         return program
     }
 
-    override fun isValid(): Boolean = this.program != OpenGLShader.INVALID_PROGRAM
+    override fun computeHasInstances(): Boolean = this.dataFreeSlots.size == (this.instanceData.capacity() / this.instanceDataStrideSize)
+    override fun onAddInstance(): Int {
+        val i: Int? = this.dataFreeSlots.removeLastOrNull()
+        if (i == null) {
+            this.vertexData = ByteBuffer
+                .allocateDirect(this.vertexData.capacity() + this.vertexDataStrideSize * this.verticesPerInstance)
+                .order(ByteOrder.nativeOrder())
+                .put(this.vertexData)
+                .rewind()
+            glBindBuffer(GL_ARRAY_BUFFER, this.vertexBuffer)
+            glBufferData(GL_ARRAY_BUFFER, this.vertexData, GL_STATIC_DRAW)
 
-    override fun onAddInstance(): Unit {
-        glUseProgram(this.program)
-        glBindVertexArray(this.vao)
+            this.instanceData = ByteBuffer
+                .allocateDirect(this.instanceData.capacity() + this.instanceDataStrideSize)
+                .order(ByteOrder.nativeOrder())
+                .put(this.instanceData)
+                .rewind()
+            glBindBuffer(GL_ARRAY_BUFFER, this.instanceBuffer)
+            glBufferData(GL_ARRAY_BUFFER, this.instanceData, GL_STATIC_DRAW)
+        }
 
-        this.vertexData = ByteBuffer
-            .allocateDirect(this.vertexData.capacity() + this.vertexDataStrideSize * this.verticesPerInstance)
-            .order(ByteOrder.nativeOrder())
-            .put(this.vertexData)
-            .rewind()
-        glBindBuffer(GL_ARRAY_BUFFER, this.vertexBuffer)
-        glBufferData(GL_ARRAY_BUFFER, this.vertexData, GL_STATIC_DRAW)
-
-        this.instanceData = ByteBuffer
-            .allocateDirect(this.instanceData.capacity() + this.instanceDataStrideSize)
-            .order(ByteOrder.nativeOrder())
-            .put(this.instanceData)
-            .rewind()
-        glBindBuffer(GL_ARRAY_BUFFER, this.instanceBuffer)
-        glBufferData(GL_ARRAY_BUFFER, this.instanceData, GL_STATIC_DRAW)
-    }
-    private fun removeBufferSlice(buffer: ByteBuffer, startI: Int, endI: Int): ByteBuffer {
-        val removedLength: Int = endI - startI + 1
-        val newBuffer: ByteBuffer = ByteBuffer.allocateDirect(buffer.capacity() - removedLength).order(ByteOrder.nativeOrder())
-
-        buffer.position(0).limit(startI)
-        newBuffer.put(buffer)
-        buffer.position(endI + 1).limit(buffer.capacity())
-        newBuffer.put(buffer)
-
-        return newBuffer.flip()
+        return i ?: ((this.instanceData.capacity() / this.instanceDataStrideSize) - 1)
     }
     override fun onRemoveInstance(i: Int): Unit {
-        glUseProgram(this.program)
-        glBindVertexArray(this.vao)
-
-        val vertexStartI: Int = this.vertexDataStrideSize * this.verticesPerInstance * i
-        val vertexEndI: Int = vertexStartI + this.vertexDataStrideSize * this.verticesPerInstance
-        this.vertexData = this.removeBufferSlice(this.vertexData, vertexStartI, vertexEndI)
-        glBindBuffer(GL_ARRAY_BUFFER, this.vertexBuffer)
-        glBufferData(GL_ARRAY_BUFFER, this.vertexData, GL_STATIC_DRAW)
-
-        val instanceStartI: Int = this.instanceDataStrideSize * i
-        val instanceEndI: Int = instanceStartI + this.instanceDataStrideSize
-        this.instanceData = this.removeBufferSlice(this.instanceData, instanceStartI, instanceEndI)
-        glBindBuffer(GL_ARRAY_BUFFER, this.instanceBuffer)
-        glBufferData(GL_ARRAY_BUFFER, this.instanceData, GL_STATIC_DRAW)
+        this.dataFreeSlots.add(i)
     }
     override fun <T> onSetVertexAttribute(
         handle: ShaderVertexAttributeHandle<T>, updater: (ByteBuffer, Int, T) -> Unit, instanceI: Int,
         values: Array<T>
     ): Unit {
-        val data: OpenGLShaderAttributeData? = this.vertexAttributeMappings[handle]
-        if (data == null) {
-            this.errorCallback("Cannot set vertex attribute, this handle isn't registered to $this")
-        } else if (!this.isValid()) {
-            this.errorCallback("Cannot set vertex attribute '${data.name}', $this is invalid")
+        val location: Int? = this.vertexAttributeMappings[handle]
+        if (location == null) {
+            this.errorCallback("Cannot set vertex attribute '$handle', the handle isn't registered to $this")
+        } else if (!this.exists()) {
+            this.errorCallback("Cannot set vertex attribute '$handle', $this doesn't exist")
         } else if (values.size != this.verticesPerInstance) {
-            this.errorCallback("Cannot set vertex attribute '${data.name}' of $this, expected ${this.verticesPerInstance} values, got ${values.size}")
+            this.errorCallback("Cannot set vertex attribute '$handle' of $this, expected ${this.verticesPerInstance} values, got ${values.size}")
         } else {
-            var i: Int = this.vertexDataStrideSize * this.verticesPerInstance * instanceI + data.location
+            var i: Int = this.vertexDataStrideSize * this.verticesPerInstance * instanceI + location
             values.forEach {
                 updater(this.vertexData, i, it)
+                this.vertexDataDirtyRanges.add(BufferRange(i, i + handle.primitive.byteSize * handle.type.numComponents))
                 i += this.vertexDataStrideSize
             }
-            this.isVertexDataDirty = true
         }
     }
     override fun <T> onSetInstanceAttribute(
         handle: ShaderInstanceAttributeHandle<T>, updater: (ByteBuffer, Int, T) -> Unit, instanceI: Int,
         value: T
     ): Unit {
-        val data: OpenGLShaderAttributeData? = this.instanceAttributeMappings[handle]
-        if (data == null) {
-            this.errorCallback("Cannot set instance attribute, this handle isn't registered to $this")
-        } else if (!this.isValid()) {
-            this.errorCallback("Cannot set instance attribute '${data.name}', $this is invalid")
+        val location: Int? = this.instanceAttributeMappings[handle]
+        if (location == null) {
+            this.errorCallback("Cannot set instance attribute '$handle', the handle isn't registered to $this")
+        } else if (!this.exists()) {
+            this.errorCallback("Cannot set instance attribute '$handle', $this doesn't exist")
         } else {
-            val i: Int = this.instanceDataStrideSize * instanceI + data.location
+            val i: Int = this.instanceDataStrideSize * instanceI + location
             updater(this.instanceData, i, value)
-            this.isInstanceDataDirty = true
+            this.instanceDataDirtyRanges.add(BufferRange(i, i + handle.primitive.byteSize * handle.type.numComponents))
         }
     }
     private fun <T> getUniformUpdater(handle: ShaderUniformHandle<T>, location: Int, value: T): () -> Unit = when (handle.type) {
@@ -244,73 +229,84 @@ internal class OpenGLShader(
         ShaderUniformType.Image2DSampler -> {{
             value as ShaderSampledImage2D
             val unit: Int = this.textureUnitMappings[handle]!!
-            this.textureBindings[unit] = this.samplerManager.getTexture2D(value.img)
-            this.textureTypeBindings[unit] = GL_TEXTURE_2D
-            this.samplerBindings[unit] = this.samplerManager.getGLSampler(value.sampler)
+            this.textureBindings[unit].texture = this.samplerManager.getTexture2D(value.img)
+            this.textureBindings[unit].type = GL_TEXTURE_2D
+            this.textureBindings[unit].sampler = this.samplerManager.getGLSampler(value.sampler)
             glUniform1i(location, unit)
         }}
         ShaderUniformType.Image2DArraySampler -> {{
             value as ShaderSampledImage2DArray
             val unit: Int = this.textureUnitMappings[handle]!!
-            this.textureBindings[unit] = this.samplerManager.getTexture2DArray(value.imgs)
-            this.textureTypeBindings[unit] = GL_TEXTURE_2D_ARRAY
-            this.samplerBindings[unit] = this.samplerManager.getGLSampler(value.sampler)
+            this.textureBindings[unit].texture = this.samplerManager.getTexture2DArray(value.imgs)
+            this.textureBindings[unit].type = GL_TEXTURE_2D_ARRAY
+            this.textureBindings[unit].sampler = this.samplerManager.getGLSampler(value.sampler)
             glUniform1i(location, unit)
         }}
     }
     override fun <T> setUniform(handle: ShaderUniformHandle<T>, value: T): Unit {
-        val data: OpenGLShaderAttributeData? = this.uniformMappings[handle]
-        if (data == null) {
-            this.errorCallback("Cannot set uniform, this handle isn't registered to $this")
-        } else if (!this.isValid()) {
-            this.errorCallback("Cannot set uniform '${data.name}', $this is invalid")
+        val location: Int? = this.uniformMappings[handle]
+        if (location == null) {
+            this.errorCallback("Cannot set uniform '$handle', the handle isn't registered to $this")
+        } else if (!this.exists()) {
+            this.errorCallback("Cannot set uniform '$handle', $this doesn't exist")
         } else {
-            this.uniformUpdatesQueue.add(this.getUniformUpdater(handle, data.location, value))
+            this.uniformUpdatesQueue.add(this.getUniformUpdater(handle, location, value))
         }
     }
 
-    internal fun bindVertexBuffer(): Unit {
-        glUseProgram(this.program)
-        glBindVertexArray(this.vao)
-        glBindBuffer(GL_ARRAY_BUFFER, this.vertexBuffer)
+    private fun uploadBufferRanges(data: ByteBuffer, ranges: MutableList<BufferRange>): Unit {
+        ranges.sortBy { it.start }
+        val mergedRanges: MutableList<BufferRange> = mutableListOf()
+        var start: Int = ranges[0].start
+        var end: Int = ranges[0].end
+        for (i in 1..<ranges.size) {
+            val range: BufferRange = ranges[i]
+            if (end < range.start) {
+                mergedRanges.add(BufferRange(start, end))
+                start = range.start
+            }
+            end = range.end
+        }
+        mergedRanges.add(BufferRange(start, end))
+
+        val limit: Int = data.limit()
+        mergedRanges.forEach {
+            data.limit(it.end).position(it.start)
+            glBufferSubData(GL_ARRAY_BUFFER, it.start.toLong(), data)
+        }
+        data.rewind().limit(limit)
     }
-    internal fun bindInstanceBuffer(): Unit {
+    override fun onBind(): Unit {
+        val context: OpenGLContext = this.contextProvider()
+
         glUseProgram(this.program)
-        glBindVertexArray(this.vao)
-        glBindBuffer(GL_ARRAY_BUFFER, this.instanceBuffer)
+        val state: OpenGLShaderState = this.stateProvider(context, this)
+        glBindVertexArray(state.vao)
+
+        if (this.vertexDataDirtyRanges.isNotEmpty()) {
+            glBindBuffer(GL_ARRAY_BUFFER, this.vertexBuffer)
+            this.uploadBufferRanges(this.vertexData, this.vertexDataDirtyRanges)
+            this.vertexDataDirtyRanges.clear()
+        }
+        if (this.instanceDataDirtyRanges.isNotEmpty()) {
+            glBindBuffer(GL_ARRAY_BUFFER, this.instanceBuffer)
+            this.uploadBufferRanges(this.instanceData, this.instanceDataDirtyRanges)
+            this.instanceDataDirtyRanges.clear()
+        }
+        if (this.uniformUpdatesQueue.isNotEmpty()) {
+            this.uniformUpdatesQueue.forEach { it() }
+            this.uniformUpdatesQueue.clear()
+        }
+        this.textureBindings.forEachIndexed { i, binding ->
+            context.bindTexture(i, binding.texture, binding.type, binding.sampler)
+        }
     }
+
     override fun onDestroy(): Unit {
-        glDeleteVertexArrays(this.vao)
         glDeleteBuffers(this.vertexBuffer)
         glDeleteBuffers(this.instanceBuffer)
         glDeleteBuffers(this.ebo)
         glDeleteProgram(this.program)
         this.program = OpenGLShader.INVALID_PROGRAM
-    }
-
-    internal fun draw(graphicsContext: OpenGLContext): Unit { // TODO
-        glUseProgram(this.program)
-        glBindVertexArray(this.vao)
-
-        if (this.isVertexDataDirty) {
-            glBindBuffer(GL_ARRAY_BUFFER, this.vertexBuffer)
-            glBufferSubData(GL_ARRAY_BUFFER, 0, this.vertexData)
-            this.isVertexDataDirty = false
-        }
-        if (this.isInstanceDataDirty) {
-            glBindBuffer(GL_ARRAY_BUFFER, this.instanceBuffer)
-            glBufferSubData(GL_ARRAY_BUFFER, 0, this.instanceData)
-            this.isInstanceDataDirty = false
-        }
-        if (!this.uniformUpdatesQueue.isEmpty()) {
-            this.uniformUpdatesQueue.forEach { it() }
-            this.uniformUpdatesQueue.clear()
-        }
-
-        this.textureBindings.indices.forEach {
-            graphicsContext.bindTexture(it, this.textureBindings[it], this.textureTypeBindings[it], this.samplerBindings[it])
-        }
-
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0)
     }
 }

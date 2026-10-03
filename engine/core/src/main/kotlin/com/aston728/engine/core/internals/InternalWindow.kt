@@ -1,22 +1,27 @@
 package com.aston728.engine.core.internals
 
 import com.aston728.engine.core.geometry.BorderSize
-import com.aston728.engine.core.geometry.Rect
 import com.aston728.engine.core.geometry.IntPosition
 import com.aston728.engine.core.geometry.IntSize
+import com.aston728.engine.core.geometry.Rect
 import com.aston728.engine.core.internals.devices.Cursor
 import com.aston728.engine.core.internals.devices.DeviceAction
 import com.aston728.engine.core.internals.devices.Key
 import com.aston728.engine.core.internals.devices.MouseButton
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.glfw.GLFWDropCallback
+import org.lwjgl.glfw.GLFWImage
 import org.lwjgl.glfw.GLFWNativeWin32
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.windows.User32
 
-internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext: Boolean) {
+internal class InternalWindow(isDebugOn: Boolean) {
+    companion object {
+        private var SHARED_CONTEXT_HANDLE: Long = NULL
+    }
+
     // TODO: how to content scale
-    private var handle: Long = this.create(sharedContextHandle, shouldHaveDebugContext)
+    private var handle: Long = this.create(isDebugOn)
 
     private var savedPosition: IntPosition = if (this.exists()) { this.getPosition() } else { IntPosition() }
     private var savedSize: IntSize = if (this.exists()) { this.getSize() } else { IntSize() }
@@ -36,24 +41,25 @@ internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext
     private var cursor: Cursor = Cursor.ARROW
     private var glfwCursor: Long = glfwCreateStandardCursor(this.cursor.toGLFWCursor())
 
-    private fun create(sharedContextHandle: Long?, shouldHaveDebugContext: Boolean): Long {
+    private fun create(isDebugOn: Boolean): Long {
         glfwDefaultWindowHints()
 
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3)
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE)
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE)
-        if (shouldHaveDebugContext) {
+        if (isDebugOn) {
             glfwWindowHint(GLFW_CONTEXT_DEBUG, GLFW_TRUE)
         }
 
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
-        return glfwCreateWindow(1, 1, "", NULL, sharedContextHandle ?: NULL)
+        val handle = glfwCreateWindow(1, 1, "", NULL, InternalWindow.SHARED_CONTEXT_HANDLE)
+        if (handle != NULL) { InternalWindow.SHARED_CONTEXT_HANDLE = handle }
+        return handle
     }
 
     internal fun getHandle(): Long = this.handle
     internal fun exists(): Boolean = this.handle != NULL
-    internal fun shouldClose(): Boolean = glfwWindowShouldClose(this.handle)
     internal fun getTitle(): String? = glfwGetWindowTitle(this.handle)
     internal fun getPosition(): IntPosition {
         val x: IntArray = IntArray(1)
@@ -112,27 +118,50 @@ internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext
         val exStyle: Long = User32.GetWindowLongPtr(win32Handle, User32.GWL_EXSTYLE)
         return (exStyle and User32.WS_EX_TOOLWINDOW.toLong()) != 0L
     }
-    internal fun isUtility(): Boolean {
-        val platform: Int = glfwGetPlatform()
-        if (platform == GLFW_PLATFORM_WIN32) { return this.isUtilityWin32() }
-        return false
-    }
+    internal fun isUtility(): Boolean =
+        (glfwGetPlatform() == GLFW_PLATFORM_WIN32 && this.isUtilityWin32())
 
-    internal fun show(): InternalWindow = apply {
+    internal fun show(): Unit {
         this.isVisible = true
         glfwShowWindow(this.handle)
     }
-    internal fun hide(): InternalWindow = apply {
+    internal fun hide(): Unit {
         this.isVisible = false
         glfwHideWindow(this.handle)
     }
-    internal fun setShouldClose(shouldClose: Boolean): InternalWindow = apply {
-        glfwSetWindowShouldClose(this.handle, shouldClose)
+    internal fun stopClosing(): Unit {
+        glfwSetWindowShouldClose(this.handle, false)
     }
-    internal fun setTitle(title: String): InternalWindow = apply {
+    internal fun setTitle(title: String): Unit {
         glfwSetWindowTitle(this.handle, title)
     }
-    internal fun setPosition(position: IntPosition): InternalWindow = apply {
+    internal fun setIcon(icon: Image?): Unit {
+        if (icon == null) {
+            glfwSetWindowIcon(this.handle, null)
+        } else {
+            val glfwIcon: GLFWImage.Buffer = GLFWImage.create(1)
+            glfwIcon.get(0)
+                .width(icon.getWidth())
+                .height(icon.getHeight())
+                .pixels(icon.getPixels())
+            glfwSetWindowIcon(this.handle, glfwIcon)
+        }
+    }
+    internal fun setIcon(icons: List<Image>): Unit {
+        if (icons.isEmpty()) {
+            glfwSetWindowIcon(this.handle, null)
+        } else {
+            val glfwIcons: GLFWImage.Buffer = GLFWImage.create(icons.size)
+            icons.forEachIndexed { i, icon ->
+                glfwIcons.get(i)
+                    .width(icon.getWidth())
+                    .height(icon.getHeight())
+                    .pixels(icon.getPixels())
+            }
+            glfwSetWindowIcon(this.handle, glfwIcons)
+        }
+    }
+    internal fun setPosition(position: IntPosition): Unit {
         this.savedPosition = position
         if (this.isNormal()) {
             val frameSize: BorderSize = this.getFrameSize()
@@ -142,7 +171,7 @@ internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext
             if (actualPosition != this.savedPosition) { this.savedPosition = actualPosition }
         }
     }
-    internal fun setSize(size: IntSize): InternalWindow = apply {
+    internal fun setSize(size: IntSize): Unit {
         this.savedSize = size
         if (this.isNormal()) {
             glfwSetWindowSize(this.handle, this.savedSize.width, this.savedSize.height)
@@ -151,7 +180,7 @@ internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext
             if (actualSize != this.savedSize) { this.savedSize = actualSize }
         }
     }
-    internal fun setMinimumSize(size: IntSize?): InternalWindow = apply {
+    internal fun setMinimumSize(size: IntSize?): Unit {
         this.minimumSize = size
         glfwSetWindowSizeLimits(
             this.handle,
@@ -160,7 +189,7 @@ internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext
         )
         if (size != null) { this.savedSize = this.savedSize.flooredAt(size) }
     }
-    internal fun setMaximumSize(size: IntSize?): InternalWindow = apply {
+    internal fun setMaximumSize(size: IntSize?): Unit {
         this.maximumSize = size
         glfwSetWindowSizeLimits(
             this.handle,
@@ -169,34 +198,34 @@ internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext
         )
         if (size != null) { this.savedSize = this.savedSize.ceiledAt(size) }
     }
-    internal fun focus(): InternalWindow = apply {
+    internal fun focus(): Unit {
         glfwFocusWindow(this.handle)
     }
-    internal fun setOpacity(opacity: Float): InternalWindow = apply {
+    internal fun setOpacity(opacity: Float): Unit {
         glfwSetWindowOpacity(this.handle, opacity)
     }
-    internal fun setResizable(isResizable: Boolean): InternalWindow = apply {
+    internal fun setResizable(isResizable: Boolean): Unit {
         glfwSetWindowAttrib(
             this.handle, GLFW_RESIZABLE,
             if (isResizable) { 1 } else { 0 }
         )
     }
-    internal fun setBordered(isBordered: Boolean): InternalWindow = apply {
+    internal fun setBordered(isBordered: Boolean): Unit {
         glfwSetWindowAttrib(
             this.handle, GLFW_DECORATED,
             if (isBordered) { 1 } else { 0 }
         )
     }
-    internal fun setAlwaysOnTop(isAlwaysOnTop: Boolean): InternalWindow = apply {
+    internal fun setAlwaysOnTop(isAlwaysOnTop: Boolean): Unit {
         glfwSetWindowAttrib(
             this.handle, GLFW_FLOATING,
             if (isAlwaysOnTop) { 1 } else { 0 }
         )
     }
-    internal fun requestAttention(): InternalWindow = apply {
+    internal fun requestAttention(): Unit {
         glfwRequestWindowAttention(this.handle)
     }
-    internal fun setCursor(cursor: Cursor): InternalWindow = apply {
+    internal fun setCursor(cursor: Cursor): Unit {
         glfwDestroyCursor(this.glfwCursor)
         this.cursor = cursor
         this.glfwCursor = glfwCreateStandardCursor(this.cursor.toGLFWCursor())
@@ -211,7 +240,7 @@ internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext
             else { exStyle and User32.WS_EX_TOOLWINDOW.inv().toLong() }
         User32.SetWindowLongPtr(null, win32Handle, User32.GWL_EXSTYLE, exStyle)
     }
-    internal fun setUtility(isUtility: Boolean): InternalWindow = apply {
+    internal fun setUtility(isUtility: Boolean): Unit {
         val platform = glfwGetPlatform()
         if (platform == GLFW_PLATFORM_WIN32) { this.setUtilityWin32(isUtility) }
     }
@@ -281,7 +310,8 @@ internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext
             glfwRestoreWindow(this.handle)
             this.isMinimized = false
         }
-        this.setSize(this.savedSize).setPosition(this.savedPosition)
+        this.setSize(this.savedSize)
+        this.setPosition(this.savedPosition)
 
         this.isMinimized = isMinimized
         this.isMaximized = isMaximized
@@ -347,11 +377,13 @@ internal class InternalWindow(sharedContextHandle: Long?, shouldHaveDebugContext
         this.pendingSize = null
 
         if (this.didUnminimize) {
-            this.setSize(this.savedSize).setPosition(this.savedPosition)
+            this.setSize(this.savedSize)
+            this.setPosition(this.savedPosition)
             this.didUnminimize = false
         }
         if (this.didUnmaximize) {
-            this.setSize(this.savedSize).setPosition(this.savedPosition)
+            this.setSize(this.savedSize)
+            this.setPosition(this.savedPosition)
             this.didUnmaximize = false
         }
     }

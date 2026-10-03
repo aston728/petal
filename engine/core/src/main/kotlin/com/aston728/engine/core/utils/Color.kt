@@ -1,7 +1,7 @@
 package com.aston728.engine.core.utils
 
 public data class Color(public val r: UByte, public val g: UByte, public val b: UByte, public val a: UByte = 255u) {
-    public fun toNormalizedFloatArray(): FloatArray = floatArrayOf(
+    public fun toNormalizedArray(): FloatArray = floatArrayOf(
         this.r.toFloat() / 255.0f,
         this.g.toFloat() / 255.0f,
         this.b.toFloat() / 255.0f,

@@ -14,6 +14,4 @@ internal value class DirtyFlags private constructor(private val bits: Int) {
     internal operator fun contains(other: DirtyFlags): Boolean = (this.bits and other.bits) == other.bits
     internal operator fun plus(other: DirtyFlags): DirtyFlags = DirtyFlags(this.bits or other.bits)
     internal operator fun minus(other: DirtyFlags): DirtyFlags = DirtyFlags(this.bits and other.bits.inv())
-
-    internal fun toBinaryString(): String = Integer.toBinaryString(this.bits)
 }

@@ -31,7 +31,7 @@ public class Anchor private constructor(
         return depth
     }
 
-    internal fun setRect(rect: Rect): Anchor = apply {
+    internal fun setRect(rect: Rect): Unit {
         this.rect = rect
     }
     internal fun resolvePosition(): IntPosition = this.rect.getByCoordinate(this.coordinate)

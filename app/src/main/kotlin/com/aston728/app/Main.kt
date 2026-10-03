@@ -6,7 +6,6 @@ import com.aston728.engine.core.geometry.Coordinate
 import com.aston728.engine.core.geometry.IntOffset
 import com.aston728.engine.core.geometry.IntSize
 import com.aston728.engine.core.geometry.SizePercentage
-import com.aston728.engine.core.internals.image.Image
 import com.aston728.engine.core.math.HVec4
 import com.aston728.engine.core.math.Half
 import com.aston728.engine.core.math.Vec2
@@ -28,23 +27,24 @@ fun main(): Unit {
     val img = engine.getContext().assetManager.loadImage("test.png")
     val sampler = ShaderSampledImage2D(img)
 
-    val shaderPosition: ShaderVertexAttributeHandle<Vec2> = ShaderVertexAttributeHandle.vec2()
-    val shaderTextureCoord = ShaderVertexAttributeHandle.vec2()
-    val shaderColor = ShaderInstanceAttributeHandle.hVec4()
-    val shaderSampler = ShaderUniformHandle.img2D()
+    val shaderPosition: ShaderVertexAttributeHandle<Vec2> = ShaderVertexAttributeHandle.vec2("position")
+    val shaderTextureCoord = ShaderVertexAttributeHandle.vec2("ITextureCoord")
+    val shaderColor = ShaderInstanceAttributeHandle.hVec4("IColor")
+    val shaderSampler = ShaderUniformHandle.img2D("a")
     val testShader1: ShaderSpec = ShaderSpec()
         .setName("Shader1")
-        .addVertexAttribute("position", shaderPosition)
-        .addVertexAttribute("ITextureCoord", shaderTextureCoord)
-        .addInstanceAttribute("IColor", shaderColor)
+        .addVertexAttribute(shaderPosition)
+        .addVertexAttribute(shaderTextureCoord)
+        .addInstanceAttribute(shaderColor)
         .addIntermediateAttribute("color", ShaderAttributeType.Vec4)
         .addIntermediateAttribute("textureCoord", ShaderAttributeType.Vec2)
-        .addUniform("testSampler", shaderSampler, sampler)
+        .addUniform(shaderSampler, sampler)
         .setVertexShaderBody("gl_Position = vec4(position, 0.0, 1.0); color = IColor; textureCoord = ITextureCoord;")
-        .setFragmentShaderBody("oColor = texture(testSampler, textureCoord);")
+        .setFragmentShaderBody("oColor = color;")
 
     val testWindow1: Window = engine.createWindow()
         .setName("Test Window 1")
+        .setTitle("a")
         .setSize(IntSize(800, 800))
     val testUI1: UI = UI()
         .setName("Test UI 1")
@@ -61,37 +61,39 @@ fun main(): Unit {
             ShaderInstanceData(shaderColor, HVec4(Half.ONE, Half.ONE, Half.ZERO, Half.ONE))
         ))
         .setSizePercentage(SizePercentage(10.0, 10.0))
+    testButton1.addOnClickHandler({
+        testButton1.getShaderInstance().setInstanceAttribute(shaderColor, HVec4(Half.ONE, Half.ZERO, Half.ZERO, Half.ONE))
+    })
+
+    val testWindow2: Window = engine.createWindow()
+        .setName("Test Window 2")
+        .setTitle("b")
+    val testUI2: UI = UI()
+        .setName("Test UI 2")
+        .setBackgroundColor(Color.PURPLE)
     val testButton2: Button = Button()
         .setName("Test Button 2")
         .setPosition(
             Anchor.toWindow(Coordinate.CENTER),
             Coordinate.CENTER, IntOffset(0, 0)
         )
+        .setSizePercentage(SizePercentage(10.0, 10.0))
         .setShader(testShader1, data = listOf(
-            ShaderVertexData(shaderPosition, arrayOf(Vec2(0.5f, -0.5f), Vec2(1.0f, -0.5f), Vec2(1.0f,  0.5f), Vec2(0.5f,  0.5f))),
-            ShaderVertexData(shaderTextureCoord, arrayOf(Vec2(0.0f, 0.0f), Vec2(0.0f, 1.0f), Vec2(1.0f, 0.0f), Vec2(1.0f, 1.0f))),
+            ShaderVertexData(shaderPosition, arrayOf(Vec2(-0.5f, 0.5f), Vec2(0.5f, 0.5f), Vec2(-0.5f, -0.5f), Vec2(0.5f, -0.5f))),
+            ShaderVertexData(shaderTextureCoord, arrayOf(Vec2(0.0f, 0.0f), Vec2(1.0f, 0.0f), Vec2(0.0f, 1.0f), Vec2(1.0f, 1.0f))),
             ShaderInstanceData(shaderColor, HVec4(Half.ONE, Half.ONE, Half.ZERO, Half.ONE))
         ))
-        .setSizePercentage(SizePercentage(10.0, 10.0))
-
-    /*val testWindow2: Window = engine.createWindow()
-        .setName("Test Window 2")
-    val testUI2: UI = UI()
-        .setName("Test UI 2")
-        .setBackgroundColor(Color.PURPLE)
-    val testButton3: Button = Button()
-        .setName("Test Button 2")
-        .setPosition(
-            Anchor.toWindow(Coordinate.CENTER),
-            Coordinate.CENTER, IntOffset(0, 0)
-        )
-        .setSizePercentage(SizePercentage(10.0, 10.0))
-        .addOnClickHandler({ println("Clicked") })*/
+        .addOnClickHandler({ println("Clicked") })
 
     engine.setStructure(
         testWindow1.setStructure(
             testUI1.setStructure(
                 testButton1,
+            )
+        ),
+        testWindow2.setStructure(
+            testUI2.setStructure(
+                testButton2,
             )
         )
     )

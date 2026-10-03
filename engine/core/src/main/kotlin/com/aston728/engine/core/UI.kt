@@ -5,20 +5,20 @@ import com.aston728.engine.core.elementBase.UIElement
 import com.aston728.engine.core.elementBase.layout.Anchor
 import com.aston728.engine.core.elementBase.layout.AnchorType
 import com.aston728.engine.core.elementBase.layout.SizeReference
-import com.aston728.engine.core.geometry.IntPosition
 import com.aston728.engine.core.geometry.IntSize
 import com.aston728.engine.core.geometry.Rect
-import com.aston728.engine.core.internals.image.Image
-import com.aston728.engine.core.rendererBase.Shader
+import com.aston728.engine.core.rendererBase.*
 import com.aston728.engine.core.utils.Color
 import com.aston728.engine.core.utils.NamedObject
+import java.util.*
+
 
 public class UI : NamedObject<UI>("Unnamed UI") {
     private var context: EngineContext = defaultEngineContext
 
-    private val elements: MutableSet<UIElement<*>> = mutableSetOf()
-    private val anchorMappings: MutableMap<UIElement<*>, MutableSet<UIElement<*>>> = mutableMapOf()
-    private val parentMappings: MutableMap<UIElement<*>, MutableSet<UIElement<*>>> = mutableMapOf()
+    private val elements: MutableSet<UIElement<*>> = Collections.newSetFromMap(IdentityHashMap())
+    private val anchorMappings: IdentityHashMap<UIElement<*>, MutableSet<UIElement<*>>> = IdentityHashMap()
+    private val parentMappings: IdentityHashMap<UIElement<*>, MutableSet<UIElement<*>>> = IdentityHashMap()
 
     private var hoveredElement: UIElement<*>? = null
 
@@ -32,7 +32,7 @@ public class UI : NamedObject<UI>("Unnamed UI") {
         this.backgroundColor = color
     }
 
-    internal fun attachContext(context: EngineContext): UI = apply {
+    internal fun attachContext(context: EngineContext): Unit {
         if (this.context != context) {
             this.context = context
             this.elements.forEach { it.attachContext(this.context) }
@@ -43,9 +43,8 @@ public class UI : NamedObject<UI>("Unnamed UI") {
         if (!didAdd) {
             this.context.logger.warn("UI", "$this already had the element: $element")
         }
-        element
-            .addDirtyFlag(DirtyFlags.ANCHOR + DirtyFlags.POSITION + DirtyFlags.SIZE + DirtyFlags.SHADER)
-            .attachContext(this.context)
+        element.addDirtyFlag(DirtyFlags.ANCHOR + DirtyFlags.POSITION + DirtyFlags.SIZE + DirtyFlags.SHADER)
+        element.attachContext(this.context)
     }
     public fun removeElement(element: UIElement<*>): UI = apply {
         // TODO: remove elements and handle the consequences
@@ -90,7 +89,9 @@ public class UI : NamedObject<UI>("Unnamed UI") {
                 val desiredTarget: UIElement<*>? = desiredAnchor.getTarget()
                 this.anchorMappings[target]?.remove(target)
                 if (desiredTarget != null) {
-                    val anchoredElements: MutableSet<UIElement<*>> = this.anchorMappings.getOrPut(desiredTarget) { mutableSetOf() }
+                    val anchoredElements: MutableSet<UIElement<*>> = this.anchorMappings.getOrPut(desiredTarget) {
+                        Collections.newSetFromMap(IdentityHashMap())
+                    }
                     anchoredElements.add(desiredTarget)
 
                     if (desiredTarget !in this.elements) {
@@ -133,7 +134,9 @@ public class UI : NamedObject<UI>("Unnamed UI") {
             } else {
                 this.parentMappings[parent]?.remove(element)
                 if (desiredParent != null) {
-                    val children: MutableSet<UIElement<*>> = this.parentMappings.getOrPut(desiredParent) { mutableSetOf() }
+                    val children: MutableSet<UIElement<*>> = this.parentMappings.getOrPut(desiredParent) {
+                        Collections.newSetFromMap(IdentityHashMap())
+                    }
                     children.add(desiredParent)
 
                     if (desiredParent !in this.elements) {
@@ -148,16 +151,16 @@ public class UI : NamedObject<UI>("Unnamed UI") {
         }
     }
     internal fun handleDirtyLayouts(windowSize: IntSize): UI = apply {
-        val dirtyElements: MutableSet<UIElement<*>> = mutableSetOf()
+        val dirtyElements: MutableSet<UIElement<*>> = Collections.newSetFromMap(IdentityHashMap())
         val elementsStack: MutableList<UIElement<*>> = this.elements
             .filter { DirtyFlags.POSITION in it.getDirtyFlags() || DirtyFlags.SIZE in it.getDirtyFlags() }
             .toMutableList()
-        while (!elementsStack.isEmpty()) {
+        while (elementsStack.isNotEmpty()) {
             val element: UIElement<*> = elementsStack.removeLast()
             if (element in dirtyElements) { continue } // If B is anchored to A, and they're both dirty, B's children won't be processed twice
 
             dirtyElements.add(element)
-            elementsStack.addAll(this.anchorMappings.getOrDefault(element, mutableSetOf()))
+            elementsStack.addAll(this.anchorMappings.getOrDefault(element, emptySet()))
         }
 
         val sortedDirtyElements: List<UIElement<*>> = dirtyElements.sortedBy { it.getPositionUnsafe().getAnchorUnsafe().getDepth() }
@@ -172,9 +175,12 @@ public class UI : NamedObject<UI>("Unnamed UI") {
             element.reposition()
         }
     }
-    internal fun handleDirtyShaders(windowHandle: Long): UI = apply {
+    internal fun handleDirtyShaders(
+        acquireInstanceHandle: (ShaderSpec) -> ShaderInstanceHandle?,
+        releaseInstanceHandle: (ShaderInstanceHandle) -> Unit,
+    ): UI = apply {
         for (element in this.elements) {
-            if (DirtyFlags.SHADER in element.getDirtyFlags()) { element.commitShaderChange(windowHandle) }
+            if (DirtyFlags.SHADER in element.getDirtyFlags()) { element.commitShaderChange(acquireInstanceHandle, releaseInstanceHandle) }
         }
     }
 
@@ -188,13 +194,32 @@ public class UI : NamedObject<UI>("Unnamed UI") {
             if (it.isVisible()) { it.update(this.hoveredElement) }
         }
     }
-    internal fun getShaders(): List<Shader> { // TODO
-        val elements: List<UIElement<*>> = this.elements.sortedBy { it.getLayer() }
-        val drawSequence: List<Pair<Image, IntPosition>> = elements
-            .filter { it.isVisible() }
-            .flatMap { it.getDrawSequence(this.hoveredElement) }
+    internal fun getRenderCommands(): List<RenderCommand> {
+        val elements: List<UIElement<*>> = this.elements.filter { it.isVisible() }.sortedBy { it.getLayer() }
+        val renderCommands: MutableList<RenderCommand> = mutableListOf(ClearCommand(this.backgroundColor))
+        if (elements.isEmpty()) { return renderCommands }
 
-        return elements.map { it.getShader() }
+        var currentShader: Shader = elements[0].getShader()
+        val indexes: MutableList<Int> = mutableListOf()
+        for (element in elements) {
+            if (element.getShader() != currentShader) {
+                renderCommands.add(BindShaderCommand(currentShader))
+                renderCommands.add(
+                    if (indexes.size == 1) { DrawCommand(indexes[0]) }
+                    else { MultiDrawCommand(indexes.toList()) }
+                )
+                currentShader = element.getShader()
+                indexes.clear()
+            }
+            indexes.add(element.getShaderInstance().instanceI)
+        }
+        renderCommands.add(BindShaderCommand(currentShader))
+        renderCommands.add(
+            if (indexes.size == 1) { DrawCommand(indexes[0]) }
+            else { MultiDrawCommand(indexes) }
+        )
+
+        return renderCommands
     }
 
     internal fun onFocus(): Unit {
@@ -205,8 +230,5 @@ public class UI : NamedObject<UI>("Unnamed UI") {
     }
     internal fun onResize(): Unit {
         this.elements.forEach { it.addDirtyFlag(DirtyFlags.SIZE) }
-    }
-    internal fun onWindowAttach(): Unit {
-        this.elements.forEach { it.addDirtyFlag(DirtyFlags.SHADER) }
     }
 }

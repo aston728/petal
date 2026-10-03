@@ -1,11 +1,10 @@
 package com.aston728.engine.elements
 
 import com.aston728.engine.core.elementBase.UIElement
-import com.aston728.engine.core.geometry.IntPosition
 import com.aston728.engine.core.geometry.IntSize
+import com.aston728.engine.core.internals.Image
 import com.aston728.engine.core.internals.devices.Cursor
 import com.aston728.engine.core.internals.devices.MouseButton
-import com.aston728.engine.core.internals.image.Image
 import com.aston728.engine.core.math.Vec2
 import com.aston728.engine.core.rendererBase.ShaderAttributeType
 import com.aston728.engine.core.rendererBase.ShaderData
@@ -20,10 +19,10 @@ public class Button : UIElement<Button>("Unnamed Button") {
         public val DEFAULT_IMG_HOVERED: Image = Image.DEFAULT_IMG
         public val DEFAULT_IMG_DISABLED: Image = Image.DEFAULT_IMG
 
-        private val SHADER_POSITION: ShaderVertexAttributeHandle<Vec2> = ShaderVertexAttributeHandle.vec2()
+        private val SHADER_POSITION: ShaderVertexAttributeHandle<Vec2> = ShaderVertexAttributeHandle.vec2("iPosition")
         private val SHADER_SPEC: ShaderSpec = ShaderSpec()
             .setName("Button Shader")
-            .addVertexAttribute("iPosition", this.SHADER_POSITION)
+            .addVertexAttribute(this.SHADER_POSITION)
             .addOutputAttribute("oColor", ShaderAttributeType.Vec4)
             .setVertexShaderBody("gl_Position = vec4(iPosition, 0.0, 1.0);")
             .setFragmentShaderBody("oColor = vec4(1.0, 1.0, 1.0, 1.0);")
@@ -37,10 +36,13 @@ public class Button : UIElement<Button>("Unnamed Button") {
     private var imgs: List<Image> = this.initImgs.map { it.scaledTo(IntSize(0, 0)) }
 
     private var isActive: Boolean = true
-    private val onClickHandlers: MutableList<() -> Unit> = mutableListOf()
+    private val onClickHandlers: MutableList<(Button) -> Unit> = mutableListOf()
 
     init {
-        super.setShader(Button.SHADER_SPEC, data = emptyList())
+        this.addShaderChangeHandler({ _, newInstance ->
+            newInstance
+                .setVertexAttribute(Button.SHADER_POSITION, arrayOf(Vec2(-1.0f, -0.5f), Vec2(-0.5f, -0.5f), Vec2(-0.5f,  0.5f), Vec2(-1.0f,  0.5f)))
+        })
     }
 
     public fun isActive(): Boolean = this.isActive
@@ -48,27 +50,22 @@ public class Button : UIElement<Button>("Unnamed Button") {
     override fun setShader(vararg specs: ShaderSpec, data: List<ShaderData>): Button = apply {
         super.setShader(Button.SHADER_SPEC, *specs, data = data)
     }
-    public fun setImgs(imgs: List<Image>): Button = apply {
-        if (imgs.size != 3) {
-            this._context.logger.warn("BUTTON", "$this expected 3 images (unhovered, hovered, disabled), got ${imgs.size}")
-        } else {
-            this.initImgs = imgs
-            this.imgs = imgs.map { it.scaledTo(this._rect.getSize()) }
-        }
+    public fun setImgs(
+        normalImg: Image = Button.DEFAULT_IMG_NORMAL,
+        hoveredImg: Image = Button.DEFAULT_IMG_HOVERED,
+        disabledImg: Image = Button.DEFAULT_IMG_DISABLED,
+    ): Button = apply {
+        this.initImgs = listOf(normalImg, hoveredImg, disabledImg)
+        this.imgs = this.initImgs.map { it.scaledTo(this._rect.getSize()) }
     }
     public fun setActive(isActive: Boolean): Button = apply {
         this.isActive = isActive
     }
     public fun toggleActiveness(): Button = this.setActive(!this.isActive)
-    public fun addOnClickHandler(handler: () -> Unit, handle: Handle? = null): Button = apply {
-        this.onClickHandlers.add(handler)
-        handle?.setOnRemoveHandler { this.onClickHandlers.remove(handler) }
-    }
-
-    override fun onCommitShaderChange(windowHandle: Long): Unit {
-        super.onCommitShaderChange(windowHandle)
-        this._shaderInstanceHandle
-            .setVertexAttribute(Button.SHADER_POSITION, arrayOf(Vec2(-1.0f, -0.5f), Vec2(-0.5f, -0.5f), Vec2(-0.5f,  0.5f), Vec2(-1.0f,  0.5f)))
+    public fun addOnClickHandler(handler: (Button) -> Unit, handle: Handle? = null): Button = apply {
+        val wrapper: (Button) -> Unit = { button -> handler(button) }
+        this.onClickHandlers.add(wrapper)
+        handle?.setOnRemoveHandler { this.onClickHandlers.remove(wrapper) }
     }
 
     override fun getCursorType(): Cursor = if (this.isActive) { Cursor.HAND } else { Cursor.ARROW }
@@ -80,18 +77,10 @@ public class Button : UIElement<Button>("Unnamed Button") {
         this.imgs = this.initImgs.map { it.scaledTo(this._rect.getSize()) }
         return super.onResize(fullSize)
     }
-    override fun computeDrawSequence(hoveredElement: UIElement<*>?): List<Pair<Image, IntPosition>> {
-        val imgI: Int = when {
-            !this.isActive -> 2
-            hoveredElement == this -> 1
-            else -> 0
-        }
-        return listOf(this.imgs[imgI] to this._rect.getTopLeft())
-    }
 
     public fun click(): Unit {
         if (this.isActive) {
-            this.onClickHandlers.toList().forEach { it() }
+            this.onClickHandlers.toList().forEach { it(this) }
         }
     }
     override fun onUpdate(hoveredElement: UIElement<*>?): Unit {

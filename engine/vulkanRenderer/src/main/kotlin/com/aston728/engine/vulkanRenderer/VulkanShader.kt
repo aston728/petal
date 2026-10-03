@@ -7,9 +7,10 @@ import com.aston728.engine.core.rendererBase.ShaderVertexAttributeHandle
 import java.nio.ByteBuffer
 
 internal class VulkanShader(name: String) : Shader(name) {
-    override fun isValid(): Boolean = false
+    override fun exists(): Boolean = false
 
-    override fun onAddInstance(): Unit {}
+    override fun computeHasInstances(): Boolean = false
+    override fun onAddInstance(): Int = -1
     override fun onRemoveInstance(i: Int): Unit {}
     override fun <T> onSetVertexAttribute(
         handle: ShaderVertexAttributeHandle<T>, updater: (ByteBuffer, Int, T) -> Unit, instanceI: Int,
@@ -21,5 +22,6 @@ internal class VulkanShader(name: String) : Shader(name) {
     ): Unit {}
     override fun <T> setUniform(handle: ShaderUniformHandle<T>, value: T): Unit {}
 
+    override fun onBind(): Unit {}
     override fun onDestroy(): Unit {}
 }

@@ -1,7 +1,7 @@
 package com.aston728.engine.openGLRenderer
 
 import com.aston728.engine.core.geometry.IntSize
-import com.aston728.engine.core.internals.image.Image
+import com.aston728.engine.core.internals.Image
 import com.aston728.engine.core.rendererBase.ShaderSampler
 import com.aston728.engine.core.rendererBase.ShaderSamplerAddressMode
 import com.aston728.engine.core.rendererBase.ShaderSamplerFilter
@@ -60,7 +60,7 @@ internal class OpenGLShaderSamplerManager {
         glSamplerParameteri(glSampler, GL_TEXTURE_MAG_FILTER, this.getGLFilter(sampler.magFilter, sampler.mipmapMode))
         glSamplerParameteri(glSampler, GL_TEXTURE_WRAP_S, this.getGLWrap(sampler.addressModeX))
         glSamplerParameteri(glSampler, GL_TEXTURE_WRAP_T, this.getGLWrap(sampler.addressModeY))
-        glSamplerParameterfv(glSampler, GL_TEXTURE_BORDER_COLOR, sampler.borderColor.toNormalizedFloatArray())
+        glSamplerParameterfv(glSampler, GL_TEXTURE_BORDER_COLOR, sampler.borderColor.toNormalizedArray())
         glSamplerParameterf(glSampler, GL_TEXTURE_MIN_LOD, sampler.minLOD)
         glSamplerParameterf(glSampler, GL_TEXTURE_MAX_LOD, sampler.maxLOD)
         glSampler

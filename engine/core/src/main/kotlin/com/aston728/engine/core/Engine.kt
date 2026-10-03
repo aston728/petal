@@ -31,10 +31,7 @@ public class Engine private constructor(config: EngineConfig) {
         }
     }
 
-    private val graphicsApi: GraphicsApi = config.graphicsApi
-
-    private val allWindows: MutableList<Window> = mutableListOf()
-    private val activeWindows: MutableSet<Window> = mutableSetOf()
+    private val windows: MutableSet<Window> = Collections.newSetFromMap(IdentityHashMap())
     private var focusedWindow: Window? = null
 
     private var stopKey: Key? = Key.ESCAPE
@@ -46,7 +43,7 @@ public class Engine private constructor(config: EngineConfig) {
     private var didStart: Boolean = false
 
     private val logger: FrozenLogger = this.createLogger(config.engineMode)
-    private val runtime: InternalRuntime = InternalRuntime()
+    private val runtime: Runtime = Runtime()
     private val renderManager: RenderManager = this.createRenderManager(config.graphicsApi, config.engineMode == EngineMode.DEBUG)
 
     private val mouse: MouseController = MouseController()
@@ -86,14 +83,13 @@ public class Engine private constructor(config: EngineConfig) {
         val renderManager: RenderManager = ServiceLoader.load(RenderManager::class.java)
             .firstOrNull { it.api == graphicsApi }
             ?: this.logger.fatalError("ENGINE", "Cannot find implementation for graphics API: $graphicsApi")
-        return renderManager.setLogger(this.logger).setIsDebugOn(isDebugOn)
+        renderManager.setLogger(this.logger)
+        renderManager.setIsDebugOn(isDebugOn)
+        return renderManager
     }
     private fun createContext(engineMode: EngineMode): EngineContext {
         val clipboard: ClipboardService = ClipboardService(
-            windowProvider = {
-                val window: Window? = this.focusedWindow ?: this.activeWindows.firstOrNull()
-                window?.getInternalWindow()?.getHandle()
-            },
+            windowProvider = { (this.focusedWindow ?: this.windows.firstOrNull())?.getInternalWindow() },
             errorCallback = { message -> this.logger.error("CLIPBOARD", message) }
         )
 
@@ -101,21 +97,20 @@ public class Engine private constructor(config: EngineConfig) {
             this.mouse, this.keyboard,
             MonitorService(), TimeService(), clipboard,
             this.eventManager, AssetManager(this.logger),
-            this.shaderManager,
             this.logger, isDebugOn = (engineMode == EngineMode.DEBUG),
         )
     }
 
-    public fun init(): Unit {
-        val didSucceed: Boolean = this.runtime.start(errorCallback = { code, description ->
-            this.logger.error("RUNTIME", "Internal error ($code): $description")
+    public fun init(): Engine = apply {
+        val didSucceed: Boolean = this.runtime.start(errorCallback = { tag, code, description ->
+            this.logger.error(tag, "Internal error ($code): $description")
         })
         if (!didSucceed) { kotlin.system.exitProcess(1) }
 
         this.runtime
             .setMonitorEventCallback(this.context.monitors) { info, isConnected -> this.eventManager.addEvent(MonitorEvent(info, isConnected))}
     }
-    public fun shutdown(): Unit {
+    public fun shutdown(): Engine = apply {
         this.runtime.stop()
     }
 
@@ -131,7 +126,7 @@ public class Engine private constructor(config: EngineConfig) {
         if (window.getState() != WindowState.ALIVE) {
             this.logger.error("ENGINE", "Cannot focus a non-alive window: $window")
         } else {
-            if (window !in this.activeWindows) {
+            if (window !in this.windows) {
                 this.logger.warn("ENGINE", "Focused an absent window: $window")
                 this.addWindow(window)
             }
@@ -157,11 +152,10 @@ public class Engine private constructor(config: EngineConfig) {
     }
 
     public fun createWindow(): Window {
-        val window: Window = Window(this.context, this.allWindows.firstOrNull())
+        val window: Window = Window(this.context)
         if (window.getState() != WindowState.ALIVE) {
             this.logger.error("ENGINE", "Failed to create window")
         } else {
-            this.allWindows.add(window)
             this.renderManager.addWindow(window)
         }
         return window
@@ -169,21 +163,22 @@ public class Engine private constructor(config: EngineConfig) {
     private fun initWindow(window: Window): Unit {
         val internalWindow: InternalWindow = window.getInternalWindow()
         // not triggered automatically
-        this.eventManager
-            .addEvent(WindowMoveEvent(window, internalWindow.getPosition()))
-            .addEvent(WindowResizeEvent(window, internalWindow.getSize()))
+        this.eventManager.addEvent(WindowMoveEvent(window, internalWindow.getPosition()))
+        this.eventManager.addEvent(WindowResizeEvent(window, internalWindow.getSize()))
         if (internalWindow.isMinimized()) { this.eventManager.addEvent(WindowMinimizeEvent(window)) }
         else { this.eventManager.addEvent(WindowUnminimizeEvent(window)) }
         if (internalWindow.isMaximized()) { this.eventManager.addEvent(WindowMaximizeEvent(window)) }
         else { this.eventManager.addEvent(WindowUnmaximizeEvent(window)) }
 
-        window.handleUIDirtyFlags().show().focus()
+        window.handleUIDirtyFlags(this.shaderManager::acquire, this.shaderManager::release)
+        window.show()
+        window.focus()
     }
     public fun addWindow(window: Window): Engine = apply {
         if (window.getState() != WindowState.ALIVE) {
             this.logger.error("ENGINE", "Cannot add a non-alive window: $window")
         } else {
-            val didAdd: Boolean = this.activeWindows.add(window)
+            val didAdd: Boolean = this.windows.add(window)
             if (!didAdd) {
                 this.logger.warn("ENGINE", "Added an already present window: $window")
             }
@@ -201,7 +196,7 @@ public class Engine private constructor(config: EngineConfig) {
 
             window.hide()
             this.eventManager.unregisterWindow(window)
-            val didRemove: Boolean = this.activeWindows.remove(window)
+            val didRemove: Boolean = this.windows.remove(window)
             if (!didRemove) {
                 this.logger.warn("ENGINE", "Removed an already absent window: $window")
             }
@@ -215,22 +210,21 @@ public class Engine private constructor(config: EngineConfig) {
 
             window.startClosing()
             this.eventManager.addEvent(WindowCloseEvent(window))
-            this.activeWindows.remove(window)
-            this.allWindows.remove(window)
+            this.windows.remove(window)
             this.renderManager.removeWindow(window)
         }
     }
     public fun stop(): Engine = apply {
-        this.activeWindows.toList().forEach { this.destroyWindow(it) }
+        this.windows.toList().forEach { this.destroyWindow(it) }
     }
     public fun setStructure(vararg windows: Window): Engine = apply {
-        this.activeWindows.toList().forEach { this.removeWindow(it) }
+        this.windows.toList().forEach { this.removeWindow(it) }
         windows.toList().forEach { this.addWindow(it) }
     }
 
     private fun start(): Unit {
         this.didStart = true
-        this.activeWindows.forEach { this.initWindow(it) }
+        this.windows.forEach { this.initWindow(it) }
     }
     private fun handleEvent(event: Event): Unit {
         when (event) {
@@ -256,8 +250,8 @@ public class Engine private constructor(config: EngineConfig) {
                 event.window.onUnfocus()
             }
 
-            is MouseEnterEvent -> if (event.window == this.focusedWindow) { this.mouse.onEnter(event.window.getInternalWindow().getHandle()) }
-            is MouseLeaveEvent -> if (event.window == this.focusedWindow) { this.mouse.onLeave(event.window.getInternalWindow().getHandle()) }
+            is MouseEnterEvent -> if (event.window == this.focusedWindow) { this.mouse.onEnter(event.window.getInternalWindow()) }
+            is MouseLeaveEvent -> if (event.window == this.focusedWindow) { this.mouse.onLeave(event.window.getInternalWindow()) }
             is MouseMoveEvent -> if (event.window == this.focusedWindow) { this.mouse.onMove(event.position) }
             is MouseScrollEvent -> if (event.window == this.focusedWindow) { this.mouse.onScroll(event.offset) }
             is MouseButtonPressedEvent -> if (event.window == this.focusedWindow) { this.mouse.onPress(event.button) }
@@ -279,18 +273,18 @@ public class Engine private constructor(config: EngineConfig) {
             this.eventManager.dispatchEvent(event)
 
             if (event is WindowCloseRequestEvent) {
-                if (event.isCancelled) { event.window.getInternalWindow().setShouldClose(false) }
+                if (event.isCancelled) { event.window.getInternalWindow().stopClosing() }
                 else { this.destroyWindow(event.window) }
             }
         }
 
-        this.activeWindows.forEach { it.getInternalWindow().afterEvents() }
+        this.windows.forEach { it.getInternalWindow().afterEvents() }
     }
-    public fun run(): Unit {
+    public fun run(): Engine = apply {
         this.start()
 
         var lastFpsRefreshTimeSeconds: Double = this.context.time.getSecondsSinceStart()
-        while(!this.activeWindows.isEmpty()) {
+        while(this.windows.isNotEmpty()) {
             if (this.context.time.getSecondsSinceStart() - lastFpsRefreshTimeSeconds >= 1.0f) {
                 this.fps = 0.0
                 lastFpsRefreshTimeSeconds = this.context.time.getSecondsSinceStart()
@@ -304,11 +298,9 @@ public class Engine private constructor(config: EngineConfig) {
             this.focusedWindow?.setCursor(this.focusedWindow?.getUI()?.getHoveredElement()?.getCursorType())
             this.focusedWindow?.getUI()?.update()
 
-            this.activeWindows.forEach {
-                this.renderManager.render(it, it.getUI()!!.getShaders())
-            }
+            this.windows.forEach { this.renderManager.render(it, it.getUI()?.getRenderCommands() ?: emptyList()) }
 
-            this.activeWindows.forEach { it.handleUIDirtyFlags() }
+            this.windows.forEach { it.handleUIDirtyFlags(this.shaderManager::acquire, this.shaderManager::release) }
             this.fps++
         }
 

@@ -3,11 +3,6 @@ package com.aston728.engine.core.rendererBase
 import com.aston728.engine.core.math.*
 import java.nio.ByteBuffer
 
-public enum class ShaderAttributeNormalization {
-    NONE, CAST, NORMALIZED;
-    public fun isNone(): Boolean = this == ShaderAttributeNormalization.NONE
-}
-
 private class ShaderInputAttributeDescriptor<T>(
     val primitive: ShaderAttributePrimitive, val type: ShaderAttributeType,
     val updater: (ByteBuffer, Int, T) -> Unit
@@ -247,206 +242,211 @@ private object ShaderInputAttributeDescriptors {
 }
 
 public class ShaderVertexAttributeHandle<T> private constructor(
-    descriptor: ShaderInputAttributeDescriptor<T>,
-    public val normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE
+    public val name: String,
+    descriptor: ShaderInputAttributeDescriptor<T>, public val normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE
 ) {
     public val primitive: ShaderAttributePrimitive = descriptor.primitive
     public val type: ShaderAttributeType = descriptor.type
     internal val updater: (ByteBuffer, Int, T) -> Unit = descriptor.updater
     public companion object {
-        public fun int(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<Int> = ShaderVertexAttributeHandle(
+        public fun int(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<Int> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.Int } else { ShaderInputAttributeDescriptors.NormalizedInt },
             normalization
         )
-        public fun iVec2(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<IVec2> = ShaderVertexAttributeHandle(
+        public fun iVec2(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<IVec2> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.IVec2 } else { ShaderInputAttributeDescriptors.NormalizedIVec2 },
             normalization
         )
-        public fun iVec3(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<IVec3> = ShaderVertexAttributeHandle(
+        public fun iVec3(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<IVec3> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.IVec3 } else { ShaderInputAttributeDescriptors.NormalizedIVec3 },
             normalization
         )
-        public fun iVec4(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<IVec4> = ShaderVertexAttributeHandle(
+        public fun iVec4(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<IVec4> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.IVec4 } else { ShaderInputAttributeDescriptors.NormalizedIVec4 },
             normalization
         )
-        public fun byte(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<Byte> = ShaderVertexAttributeHandle(
+        public fun byte(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<Byte> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.Byte } else { ShaderInputAttributeDescriptors.NormalizedByte },
             normalization
         )
-        public fun bVec2(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<BVec2> = ShaderVertexAttributeHandle(
+        public fun bVec2(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<BVec2> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.BVec2 } else { ShaderInputAttributeDescriptors.NormalizedBVec2 },
             normalization
         )
-        public fun bVec3(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<BVec3> = ShaderVertexAttributeHandle(
+        public fun bVec3(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<BVec3> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.BVec3 } else { ShaderInputAttributeDescriptors.NormalizedBVec3 },
             normalization
         )
-        public fun bVec4(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<BVec4> = ShaderVertexAttributeHandle(
+        public fun bVec4(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<BVec4> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.BVec4 } else { ShaderInputAttributeDescriptors.NormalizedBVec4 },
             normalization
         )
 
-        public fun uint(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UInt> = ShaderVertexAttributeHandle(
+        public fun uint(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UInt> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UInt } else { ShaderInputAttributeDescriptors.NormalizedUInt },
             normalization
         )
-        public fun uiVec2(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UIVec2> = ShaderVertexAttributeHandle(
+        public fun uiVec2(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UIVec2> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UIVec2 } else { ShaderInputAttributeDescriptors.NormalizedUIVec2 },
             normalization
         )
-        public fun uiVec3(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UIVec3> = ShaderVertexAttributeHandle(
+        public fun uiVec3(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UIVec3> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UIVec3 } else { ShaderInputAttributeDescriptors.NormalizedUIVec3 },
             normalization
         )
-        public fun uiVec4(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UIVec4> = ShaderVertexAttributeHandle(
+        public fun uiVec4(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UIVec4> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UIVec4 } else { ShaderInputAttributeDescriptors.NormalizedUIVec4 },
             normalization
         )
-        public fun ubyte(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UByte> = ShaderVertexAttributeHandle(
+        public fun ubyte(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UByte> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UByte } else { ShaderInputAttributeDescriptors.NormalizedUByte },
             normalization
         )
-        public fun ubVec2(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UBVec2> = ShaderVertexAttributeHandle(
+        public fun ubVec2(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UBVec2> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UBVec2 } else { ShaderInputAttributeDescriptors.NormalizedUBVec2 },
             normalization
         )
-        public fun ubVec3(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UBVec3> = ShaderVertexAttributeHandle(
+        public fun ubVec3(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UBVec3> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UBVec3 } else { ShaderInputAttributeDescriptors.NormalizedUBVec3 },
             normalization
         )
-        public fun ubVec4(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UBVec4> = ShaderVertexAttributeHandle(
+        public fun ubVec4(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderVertexAttributeHandle<UBVec4> = ShaderVertexAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UBVec4 } else { ShaderInputAttributeDescriptors.NormalizedUBVec4 },
             normalization
         )
 
-        public fun float(): ShaderVertexAttributeHandle<Float> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Float)
-        public fun vec2(): ShaderVertexAttributeHandle<Vec2> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Vec2)
-        public fun vec3(): ShaderVertexAttributeHandle<Vec3> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Vec3)
-        public fun vec4(): ShaderVertexAttributeHandle<Vec4> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Vec4)
-        public fun half(): ShaderVertexAttributeHandle<Half> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HalfFloat)
-        public fun hVec2(): ShaderVertexAttributeHandle<HVec2> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HVec2)
-        public fun hVec3(): ShaderVertexAttributeHandle<HVec3> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HVec3)
-        public fun hVec4(): ShaderVertexAttributeHandle<HVec4> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HVec4)
-        public fun mat2(): ShaderVertexAttributeHandle<Mat2> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Mat2)
-        public fun mat2x3(): ShaderVertexAttributeHandle<Mat2x3> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Mat2x3)
-        public fun mat2x4(): ShaderVertexAttributeHandle<Mat2x4> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Mat2x4)
-        public fun mat3x2(): ShaderVertexAttributeHandle<Mat3x2> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Mat3x2)
-        public fun mat3(): ShaderVertexAttributeHandle<Mat3> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Mat3)
-        public fun mat3x4(): ShaderVertexAttributeHandle<Mat3x4> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Mat3x4)
-        public fun mat4x2(): ShaderVertexAttributeHandle<Mat4x2> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Mat4x2)
-        public fun mat4x3(): ShaderVertexAttributeHandle<Mat4x3> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Mat4x3)
-        public fun mat4(): ShaderVertexAttributeHandle<Mat4> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.Mat4)
-        public fun hMat2(): ShaderVertexAttributeHandle<HMat2> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HMat2)
-        public fun hMat2x3(): ShaderVertexAttributeHandle<HMat2x3> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HMat2x3)
-        public fun hMat2x4(): ShaderVertexAttributeHandle<HMat2x4> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HMat2x4)
-        public fun hMat3x2(): ShaderVertexAttributeHandle<HMat3x2> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HMat3x2)
-        public fun hMat3(): ShaderVertexAttributeHandle<HMat3> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HMat3)
-        public fun hMat3x4(): ShaderVertexAttributeHandle<HMat3x4> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HMat3x4)
-        public fun hMat4x2(): ShaderVertexAttributeHandle<HMat4x2> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HMat4x2)
-        public fun hMat4x3(): ShaderVertexAttributeHandle<HMat4x3> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HMat4x3)
-        public fun hMat4(): ShaderVertexAttributeHandle<HMat4> = ShaderVertexAttributeHandle(ShaderInputAttributeDescriptors.HMat4)
+        public fun float(name: String): ShaderVertexAttributeHandle<Float> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Float)
+        public fun vec2(name: String): ShaderVertexAttributeHandle<Vec2> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Vec2)
+        public fun vec3(name: String): ShaderVertexAttributeHandle<Vec3> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Vec3)
+        public fun vec4(name: String): ShaderVertexAttributeHandle<Vec4> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Vec4)
+        public fun half(name: String): ShaderVertexAttributeHandle<Half> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HalfFloat)
+        public fun hVec2(name: String): ShaderVertexAttributeHandle<HVec2> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HVec2)
+        public fun hVec3(name: String): ShaderVertexAttributeHandle<HVec3> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HVec3)
+        public fun hVec4(name: String): ShaderVertexAttributeHandle<HVec4> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HVec4)
+        public fun mat2(name: String): ShaderVertexAttributeHandle<Mat2> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Mat2)
+        public fun mat2x3(name: String): ShaderVertexAttributeHandle<Mat2x3> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Mat2x3)
+        public fun mat2x4(name: String): ShaderVertexAttributeHandle<Mat2x4> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Mat2x4)
+        public fun mat3x2(name: String): ShaderVertexAttributeHandle<Mat3x2> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Mat3x2)
+        public fun mat3(name: String): ShaderVertexAttributeHandle<Mat3> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Mat3)
+        public fun mat3x4(name: String): ShaderVertexAttributeHandle<Mat3x4> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Mat3x4)
+        public fun mat4x2(name: String): ShaderVertexAttributeHandle<Mat4x2> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Mat4x2)
+        public fun mat4x3(name: String): ShaderVertexAttributeHandle<Mat4x3> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Mat4x3)
+        public fun mat4(name: String): ShaderVertexAttributeHandle<Mat4> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.Mat4)
+        public fun hMat2(name: String): ShaderVertexAttributeHandle<HMat2> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HMat2)
+        public fun hMat2x3(name: String): ShaderVertexAttributeHandle<HMat2x3> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HMat2x3)
+        public fun hMat2x4(name: String): ShaderVertexAttributeHandle<HMat2x4> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HMat2x4)
+        public fun hMat3x2(name: String): ShaderVertexAttributeHandle<HMat3x2> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HMat3x2)
+        public fun hMat3(name: String): ShaderVertexAttributeHandle<HMat3> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HMat3)
+        public fun hMat3x4(name: String): ShaderVertexAttributeHandle<HMat3x4> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HMat3x4)
+        public fun hMat4x2(name: String): ShaderVertexAttributeHandle<HMat4x2> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HMat4x2)
+        public fun hMat4x3(name: String): ShaderVertexAttributeHandle<HMat4x3> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HMat4x3)
+        public fun hMat4(name: String): ShaderVertexAttributeHandle<HMat4> = ShaderVertexAttributeHandle(name, ShaderInputAttributeDescriptors.HMat4)
     }
+
+    override fun toString(): String = this.name
 }
+
 public class ShaderInstanceAttributeHandle<T> private constructor(
-    descriptor: ShaderInputAttributeDescriptor<T>,
-    public val normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE
+    public val name: String,
+    descriptor: ShaderInputAttributeDescriptor<T>, public val normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE
 ) {
     public val primitive: ShaderAttributePrimitive = descriptor.primitive
     public val type: ShaderAttributeType = descriptor.type
     internal val updater: (ByteBuffer, Int, T) -> Unit = descriptor.updater
     public companion object {
-        public fun int(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<Int> = ShaderInstanceAttributeHandle(
+        public fun int(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<Int> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.Int } else { ShaderInputAttributeDescriptors.NormalizedInt },
             normalization
         )
-        public fun iVec2(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<IVec2> = ShaderInstanceAttributeHandle(
+        public fun iVec2(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<IVec2> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.IVec2 } else { ShaderInputAttributeDescriptors.NormalizedIVec2 },
             normalization
         )
-        public fun iVec3(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<IVec3> = ShaderInstanceAttributeHandle(
+        public fun iVec3(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<IVec3> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.IVec3 } else { ShaderInputAttributeDescriptors.NormalizedIVec3 },
             normalization
         )
-        public fun iVec4(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<IVec4> = ShaderInstanceAttributeHandle(
+        public fun iVec4(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<IVec4> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.IVec4 } else { ShaderInputAttributeDescriptors.NormalizedIVec4 },
             normalization
         )
-        public fun byte(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<Byte> = ShaderInstanceAttributeHandle(
+        public fun byte(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<Byte> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.Byte } else { ShaderInputAttributeDescriptors.NormalizedByte },
             normalization
         )
-        public fun bVec2(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<BVec2> = ShaderInstanceAttributeHandle(
+        public fun bVec2(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<BVec2> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.BVec2 } else { ShaderInputAttributeDescriptors.NormalizedBVec2 },
             normalization
         )
-        public fun bVec3(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<BVec3> = ShaderInstanceAttributeHandle(
+        public fun bVec3(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<BVec3> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.BVec3 } else { ShaderInputAttributeDescriptors.NormalizedBVec3 },
             normalization
         )
-        public fun bVec4(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<BVec4> = ShaderInstanceAttributeHandle(
+        public fun bVec4(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<BVec4> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.BVec4 } else { ShaderInputAttributeDescriptors.NormalizedBVec4 },
             normalization
         )
 
-        public fun uint(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UInt> = ShaderInstanceAttributeHandle(
+        public fun uint(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UInt> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UInt } else { ShaderInputAttributeDescriptors.NormalizedUInt },
             normalization
         )
-        public fun uiVec2(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UIVec2> = ShaderInstanceAttributeHandle(
+        public fun uiVec2(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UIVec2> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UIVec2 } else { ShaderInputAttributeDescriptors.NormalizedUIVec2 },
             normalization
         )
-        public fun uiVec3(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UIVec3> = ShaderInstanceAttributeHandle(
+        public fun uiVec3(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UIVec3> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UIVec3 } else { ShaderInputAttributeDescriptors.NormalizedUIVec3 },
             normalization
         )
-        public fun uiVec4(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UIVec4> = ShaderInstanceAttributeHandle(
+        public fun uiVec4(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UIVec4> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UIVec4 } else { ShaderInputAttributeDescriptors.NormalizedUIVec4 },
             normalization
         )
-        public fun ubyte(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UByte> = ShaderInstanceAttributeHandle(
+        public fun ubyte(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UByte> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UByte } else { ShaderInputAttributeDescriptors.NormalizedUByte },
             normalization
         )
-        public fun ubVec2(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UBVec2> = ShaderInstanceAttributeHandle(
+        public fun ubVec2(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UBVec2> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UBVec2 } else { ShaderInputAttributeDescriptors.NormalizedUBVec2 },
             normalization
         )
-        public fun ubVec3(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UBVec3> = ShaderInstanceAttributeHandle(
+        public fun ubVec3(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UBVec3> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UBVec3 } else { ShaderInputAttributeDescriptors.NormalizedUBVec3 },
             normalization
         )
-        public fun ubVec4(normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UBVec4> = ShaderInstanceAttributeHandle(
+        public fun ubVec4(name: String, normalization: ShaderAttributeNormalization = ShaderAttributeNormalization.NONE): ShaderInstanceAttributeHandle<UBVec4> = ShaderInstanceAttributeHandle(name,
             if (normalization.isNone()) { ShaderInputAttributeDescriptors.UBVec4 } else { ShaderInputAttributeDescriptors.NormalizedUBVec4 },
             normalization
         )
 
-        public fun float(): ShaderInstanceAttributeHandle<Float> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Float)
-        public fun vec2(): ShaderInstanceAttributeHandle<Vec2> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Vec2)
-        public fun vec3(): ShaderInstanceAttributeHandle<Vec3> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Vec3)
-        public fun vec4(): ShaderInstanceAttributeHandle<Vec4> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Vec4)
-        public fun half(): ShaderInstanceAttributeHandle<Half> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HalfFloat)
-        public fun hVec2(): ShaderInstanceAttributeHandle<HVec2> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HVec2)
-        public fun hVec3(): ShaderInstanceAttributeHandle<HVec3> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HVec3)
-        public fun hVec4(): ShaderInstanceAttributeHandle<HVec4> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HVec4)
-        public fun mat2(): ShaderInstanceAttributeHandle<Mat2> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Mat2)
-        public fun mat2x3(): ShaderInstanceAttributeHandle<Mat2x3> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Mat2x3)
-        public fun mat2x4(): ShaderInstanceAttributeHandle<Mat2x4> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Mat2x4)
-        public fun mat3x2(): ShaderInstanceAttributeHandle<Mat3x2> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Mat3x2)
-        public fun mat3(): ShaderInstanceAttributeHandle<Mat3> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Mat3)
-        public fun mat3x4(): ShaderInstanceAttributeHandle<Mat3x4> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Mat3x4)
-        public fun mat4x2(): ShaderInstanceAttributeHandle<Mat4x2> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Mat4x2)
-        public fun mat4x3(): ShaderInstanceAttributeHandle<Mat4x3> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Mat4x3)
-        public fun mat4(): ShaderInstanceAttributeHandle<Mat4> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.Mat4)
-        public fun hMat2(): ShaderInstanceAttributeHandle<HMat2> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HMat2)
-        public fun hMat2x3(): ShaderInstanceAttributeHandle<HMat2x3> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HMat2x3)
-        public fun hMat2x4(): ShaderInstanceAttributeHandle<HMat2x4> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HMat2x4)
-        public fun hMat3x2(): ShaderInstanceAttributeHandle<HMat3x2> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HMat3x2)
-        public fun hMat3(): ShaderInstanceAttributeHandle<HMat3> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HMat3)
-        public fun hMat3x4(): ShaderInstanceAttributeHandle<HMat3x4> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HMat3x4)
-        public fun hMat4x2(): ShaderInstanceAttributeHandle<HMat4x2> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HMat4x2)
-        public fun hMat4x3(): ShaderInstanceAttributeHandle<HMat4x3> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HMat4x3)
-        public fun hMat4(): ShaderInstanceAttributeHandle<HMat4> = ShaderInstanceAttributeHandle(ShaderInputAttributeDescriptors.HMat4)
+        public fun float(name: String): ShaderInstanceAttributeHandle<Float> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Float)
+        public fun vec2(name: String): ShaderInstanceAttributeHandle<Vec2> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Vec2)
+        public fun vec3(name: String): ShaderInstanceAttributeHandle<Vec3> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Vec3)
+        public fun vec4(name: String): ShaderInstanceAttributeHandle<Vec4> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Vec4)
+        public fun half(name: String): ShaderInstanceAttributeHandle<Half> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HalfFloat)
+        public fun hVec2(name: String): ShaderInstanceAttributeHandle<HVec2> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HVec2)
+        public fun hVec3(name: String): ShaderInstanceAttributeHandle<HVec3> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HVec3)
+        public fun hVec4(name: String): ShaderInstanceAttributeHandle<HVec4> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HVec4)
+        public fun mat2(name: String): ShaderInstanceAttributeHandle<Mat2> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Mat2)
+        public fun mat2x3(name: String): ShaderInstanceAttributeHandle<Mat2x3> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Mat2x3)
+        public fun mat2x4(name: String): ShaderInstanceAttributeHandle<Mat2x4> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Mat2x4)
+        public fun mat3x2(name: String): ShaderInstanceAttributeHandle<Mat3x2> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Mat3x2)
+        public fun mat3(name: String): ShaderInstanceAttributeHandle<Mat3> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Mat3)
+        public fun mat3x4(name: String): ShaderInstanceAttributeHandle<Mat3x4> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Mat3x4)
+        public fun mat4x2(name: String): ShaderInstanceAttributeHandle<Mat4x2> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Mat4x2)
+        public fun mat4x3(name: String): ShaderInstanceAttributeHandle<Mat4x3> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Mat4x3)
+        public fun mat4(name: String): ShaderInstanceAttributeHandle<Mat4> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.Mat4)
+        public fun hMat2(name: String): ShaderInstanceAttributeHandle<HMat2> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HMat2)
+        public fun hMat2x3(name: String): ShaderInstanceAttributeHandle<HMat2x3> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HMat2x3)
+        public fun hMat2x4(name: String): ShaderInstanceAttributeHandle<HMat2x4> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HMat2x4)
+        public fun hMat3x2(name: String): ShaderInstanceAttributeHandle<HMat3x2> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HMat3x2)
+        public fun hMat3(name: String): ShaderInstanceAttributeHandle<HMat3> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HMat3)
+        public fun hMat3x4(name: String): ShaderInstanceAttributeHandle<HMat3x4> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HMat3x4)
+        public fun hMat4x2(name: String): ShaderInstanceAttributeHandle<HMat4x2> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HMat4x2)
+        public fun hMat4x3(name: String): ShaderInstanceAttributeHandle<HMat4x3> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HMat4x3)
+        public fun hMat4(name: String): ShaderInstanceAttributeHandle<HMat4> = ShaderInstanceAttributeHandle(name, ShaderInputAttributeDescriptors.HMat4)
     }
+
+    override fun toString(): String = this.name
 }

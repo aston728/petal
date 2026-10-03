@@ -14,13 +14,13 @@ public class AnchoredPosition(private var anchor: Anchor, private var coordinate
     public fun getCoordinate(): Coordinate = this.coordinate
     public fun getOffset(): IntOffset = this.offset
 
-    internal fun setAnchor(anchor: Anchor): AnchoredPosition = apply {
+    internal fun setAnchor(anchor: Anchor): Unit {
         this.desiredAnchor = anchor
     }
-    internal fun setCoordinate(coordinate: Coordinate): AnchoredPosition = apply {
+    internal fun setCoordinate(coordinate: Coordinate): Unit {
         this.coordinate = coordinate
     }
-    internal fun setOffset(offset: IntOffset): AnchoredPosition = apply {
+    internal fun setOffset(offset: IntOffset): Unit {
         this.offset = offset
     }
 

@@ -8,7 +8,7 @@ internal class BlankRenderManager : RenderManager() {
     override fun onAddWindow(handle: Long): Unit {}
     override fun onRemoveWindow(handle: Long): Unit {}
     override fun onResize(windowHandle: Long, size: IntSize): Unit {}
-    override fun onBuildShader(windowHandle: Long, spec: ShaderSpec): Shader = BlankShader(spec.getName())
-    override fun onRender(windowHandle: Long, shaders: List<Shader>): Unit {}
+    override fun onBuildShader(spec: ShaderSpec): Shader = BlankShader(spec.getName())
+    override fun onRender(windowHandle: Long, commands: List<RenderCommand>): Unit {}
     override fun onFree(): Unit {}
 }

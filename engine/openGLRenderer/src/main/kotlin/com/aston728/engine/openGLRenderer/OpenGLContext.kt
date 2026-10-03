@@ -1,30 +1,35 @@
 package com.aston728.engine.openGLRenderer
 
 import com.aston728.engine.core.geometry.IntSize
+import com.aston728.engine.core.rendererBase.Shader
 import org.lwjgl.glfw.GLFW.glfwMakeContextCurrent
 import org.lwjgl.glfw.GLFW.glfwSwapBuffers
 import org.lwjgl.opengl.*
 import org.lwjgl.opengl.GL43C.*
 import org.lwjgl.system.MemoryUtil.NULL
+import java.util.*
 
-internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debugMessageCallback: (String) -> Unit) {
-    private val capabilities: GLCapabilities = this.createCapabilities()
+internal class OpenGLContext private constructor(private val handle: Long, private val capabilities: GLCapabilities?) {
+    internal constructor() : this(0, null)
+    internal companion object {
+        internal fun create(handle: Long, isDebugOn: Boolean, debugMessageCallback: (String) -> Unit): OpenGLContext {
+            glfwMakeContextCurrent(handle)
+            val context: OpenGLContext = OpenGLContext(handle, GL.createCapabilities())
+            glEnable(GL_BLEND)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            if (isDebugOn) { context.enableDebugging(debugMessageCallback) }
+            return  context
+        }
+    }
+
     private val textureBindings: IntArray by lazy {
         IntArray(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS - GL_TEXTURE0 - 1) { 0 }
     }
     private val samplerBindings: IntArray by lazy {
         IntArray(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS - GL_TEXTURE0 - 1) { 0 }
     }
-    init {
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        if (isDebugOn) { this.enableDebugging(debugMessageCallback) }
-    }
+    private val shaderStates: IdentityHashMap<OpenGLShader, OpenGLShaderState> = IdentityHashMap()
 
-    private fun createCapabilities(): GLCapabilities {
-        glfwMakeContextCurrent(this.handle)
-        return GL.createCapabilities()
-    }
     private fun formatDebugMessageNormal(source: Int, type: Int, severity: Int, messageLength: Int, message: Long): String {
         val sourceString: String = when (source) {
             GL_DEBUG_SOURCE_API -> "API"
@@ -115,30 +120,30 @@ internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debug
         glEnable(GL_DEBUG_OUTPUT)
         glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS)
 
-        if (this.capabilities.OpenGL43) {
+        if (this.capabilities?.OpenGL43 == true) {
             glDebugMessageCallback(
-                GLDebugMessageCallback.create { source, type, id, severity, messageLength, message, userParameter ->
+                GLDebugMessageCallback.create { source, type, _, severity, messageLength, message, _ ->
                     messageCallback(this.formatDebugMessageNormal(source, type, severity, messageLength, message))
                 },
                 NULL
             )
-        } else if (this.capabilities.GL_KHR_debug) {
+        } else if (this.capabilities?.GL_KHR_debug == true) {
             KHRDebug.glDebugMessageCallback(
-                GLDebugMessageCallback.create { source, type, id, severity, messageLength, message, userParameter ->
+                GLDebugMessageCallback.create { source, type, _, severity, messageLength, message, _ ->
                     messageCallback(this.formatDebugMessageNormal(source, type, severity, messageLength, message))
                 },
                 NULL
             )
-        } else if (this.capabilities.GL_ARB_debug_output) {
+        } else if (this.capabilities?.GL_ARB_debug_output == true) {
             ARBDebugOutput.glDebugMessageCallbackARB(
-                GLDebugMessageARBCallback.create { source, type, id, severity, messageLength, message, userParameter ->
+                GLDebugMessageARBCallback.create { source, type, _, severity, messageLength, message, _ ->
                     messageCallback(this.formatDebugMessageARB(source, type, severity, messageLength, message))
                 },
                 NULL
             )
-        } else if (this.capabilities.GL_AMD_debug_output) {
+        } else if (this.capabilities?.GL_AMD_debug_output == true) {
             AMDDebugOutput.glDebugMessageCallbackAMD(
-                GLDebugMessageAMDCallback.create { id, category, severity, messageLength, message, userParameter ->
+                GLDebugMessageAMDCallback.create { _, category, severity, messageLength, message, _ ->
                     messageCallback(this.formatDebugMessageAMD(category, severity, messageLength, message))
                 },
                 NULL
@@ -159,18 +164,34 @@ internal class OpenGLContext(private val handle: Long, isDebugOn: Boolean, debug
         GL.setCapabilities(this.capabilities)
         glViewport(0, 0, size.width, size.height)
     }
-    internal fun bindTexture(unit: Int, texture: Int, textureType: Int, sampler: Int): Unit {
-        if (this.textureBindings[unit] != texture) {
-            this.textureBindings[unit] = texture
-            glActiveTexture(GL_TEXTURE0 + unit)
-            glBindTexture(textureType, texture)
-        }
-        if (this.samplerBindings[unit] != sampler) {
-            this.samplerBindings[unit] = sampler
-            glBindSampler(unit, sampler)
-        }
-    }
     internal fun swapBuffers(): Unit {
         glfwSwapBuffers(this.handle)
+    }
+
+    internal fun getOrPutShaderState(
+        shader: OpenGLShader, defaultValue: () -> OpenGLShaderState
+    ): OpenGLShaderState = this.shaderStates.getOrPut(shader, defaultValue)
+    internal fun destroyShaderState(shader: Shader): Unit {
+        glfwMakeContextCurrent(this.handle)
+        GL.setCapabilities(this.capabilities)
+        this.shaderStates[shader]?.destroy()
+        this.shaderStates.remove(shader)
+    }
+    internal fun bindTexture(unit: Int, texture: Int, textureType: Int, sampler: Int): Unit {
+        if (this.textureBindings[unit] != texture) {
+            glActiveTexture(GL_TEXTURE0 + unit)
+            glBindTexture(textureType, texture)
+            this.textureBindings[unit] = texture
+        }
+        if (this.samplerBindings[unit] != sampler) {
+            glBindSampler(unit, sampler)
+            this.samplerBindings[unit] = sampler
+        }
+    }
+
+    internal fun free(): Unit {
+        glfwMakeContextCurrent(this.handle)
+        GL.setCapabilities(this.capabilities)
+        this.shaderStates.values.forEach { it.destroy() }
     }
 }

@@ -8,6 +8,8 @@ import com.aston728.engine.core.internals.devices.DeviceAction
 import com.aston728.engine.core.internals.devices.Key
 import com.aston728.engine.core.internals.devices.MouseButton
 import com.aston728.engine.core.utils.Handle
+import java.util.IdentityHashMap
+import kotlin.collections.ArrayDeque
 import kotlin.reflect.KClass
 
 internal class EventManager : EventSubscriber {
@@ -44,7 +46,7 @@ internal class EventManager : EventSubscriber {
             DeviceAction.REPEAT -> {}
         }
     }
-    internal fun registerWindow(window: Window): EventManager = apply {
+    internal fun registerWindow(window: Window): Unit {
         window.getInternalWindow()
             .setOnCloseRequestCallback { _ -> this.addEvent(WindowCloseRequestEvent(window)) }
             .setOnMoveCallback { _, x, y -> this.addEvent(WindowMoveEvent(window, IntPosition(x, y))) }
@@ -63,7 +65,7 @@ internal class EventManager : EventSubscriber {
 
             .setOnDropCallback { _, files -> this.addEvent(FileDropEvent(window, files)) }
     }
-    internal fun unregisterWindow(window: Window): EventManager = apply {
+    internal fun unregisterWindow(window: Window): Unit {
         window.getInternalWindow()
             .setOnCloseRequestCallback {}
             .setOnMoveCallback { _, _, _ -> }
@@ -84,8 +86,8 @@ internal class EventManager : EventSubscriber {
     }
 
     internal fun compress(): Unit {
-        val windowMoveEventMap: MutableMap<Window, WindowMoveEvent> = mutableMapOf()
-        val windowResizeEventMap: MutableMap<Window, WindowResizeEvent> = mutableMapOf()
+        val windowMoveEventMap: IdentityHashMap<Window, WindowMoveEvent> = IdentityHashMap()
+        val windowResizeEventMap: IdentityHashMap<Window, WindowResizeEvent> = IdentityHashMap()
         this.events.forEach {
             when (it) {
                 is WindowMoveEvent -> windowMoveEventMap[it.window] = it
@@ -103,7 +105,7 @@ internal class EventManager : EventSubscriber {
     }
 
     internal fun poll(): Event? = this.events.removeFirstOrNull()
-    internal fun addEvent(event: Event): EventManager = apply {
+    internal fun addEvent(event: Event): Unit {
         this.events.add(event)
     }
 
@@ -115,7 +117,7 @@ internal class EventManager : EventSubscriber {
         handlers.add(wrapper)
         handle?.setOnRemoveHandler { handlers.remove(wrapper) }
     }
-    internal fun dispatchEvent(event: Event): EventManager = apply {
+    internal fun dispatchEvent(event: Event): Unit {
         this.eventMappings[event::class]?.toList()?.forEach { it(event) }
     }
 }

@@ -12,3 +12,8 @@ public enum class ShaderAttributePrimitive(public val byteSize: Int) {
     UInt(4), UByte(1), UShort(2),
     Float(4), HalfFloat(2),
 }
+
+public enum class ShaderAttributeNormalization {
+    NONE, CAST, NORMALIZED;
+    public fun isNone(): Boolean = this == ShaderAttributeNormalization.NONE
+}

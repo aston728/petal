@@ -2,6 +2,7 @@ package com.aston728.engine.core.internals.devices
 
 import com.aston728.engine.core.geometry.DecimalOffset
 import com.aston728.engine.core.geometry.DecimalPosition
+import com.aston728.engine.core.internals.InternalWindow
 import org.lwjgl.glfw.GLFW.glfwGetCursorPos
 import java.util.*
 
@@ -25,16 +26,16 @@ internal class MouseController : Mouse {
         this.justReleased.clear()
     }
 
-    internal fun onEnter(windowHandle: Long): Unit {
+    internal fun onEnter(window: InternalWindow): Unit {
         val x: DoubleArray = DoubleArray(1)
         val y: DoubleArray = DoubleArray(1)
-        glfwGetCursorPos(windowHandle, x, y)
+        glfwGetCursorPos(window.getHandle(), x, y)
         this.position = DecimalPosition(x[0], y[0])
     }
-    internal fun onLeave(windowHandle: Long): Unit {
+    internal fun onLeave(window: InternalWindow): Unit {
         val x: DoubleArray = DoubleArray(1)
         val y: DoubleArray = DoubleArray(1)
-        glfwGetCursorPos(windowHandle, x, y)
+        glfwGetCursorPos(window.getHandle(), x, y)
         this.position = DecimalPosition(x[0], y[0])
     }
     internal fun onMove(position: DecimalPosition): Unit {
