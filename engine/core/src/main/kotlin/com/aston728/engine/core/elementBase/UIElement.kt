@@ -1,13 +1,18 @@
 package com.aston728.engine.core.elementBase
 
+import com.aston728.engine.core.DEFAULT_ENGINE_CONTEXT
 import com.aston728.engine.core.EngineContext
 import com.aston728.engine.core.UI
-import com.aston728.engine.core.defaultEngineContext
+import com.aston728.engine.core.blankRenderer.BlankMaterial
+import com.aston728.engine.core.blankRenderer.BlankMesh
+import com.aston728.engine.core.blankRenderer.BlankShader
 import com.aston728.engine.core.elementBase.layout.Anchor
 import com.aston728.engine.core.elementBase.layout.AnchoredPosition
 import com.aston728.engine.core.elementBase.layout.SizeReference
 import com.aston728.engine.core.geometry.*
 import com.aston728.engine.core.internals.devices.Cursor
+import com.aston728.engine.core.math.Vec2
+import com.aston728.engine.core.math.Vec3
 import com.aston728.engine.core.rendererBase.*
 import com.aston728.engine.core.utils.Handle
 import com.aston728.engine.core.utils.NamedObject
@@ -15,11 +20,35 @@ import com.aston728.engine.core.utils.NamedObject
 public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>(name) {
     private companion object {
         private val BLANK_SHADER_SPEC: ShaderSpec = ShaderSpec()
-        private val BLANK_SHADER_ATTRIBUTES_DATA: List<ShaderData> = emptyList()
-        private val PLACEHOLDER_SHADER_HANDLE: ShaderInstanceHandle = ShaderInstanceHandle(BlankShader("Element Shader"), 0, errorCallback = {})
+        private val BLANK_SHADER_ATTRIBUTES_DATA: List<ShaderInstanceData<*>> = emptyList()
+        private val PLACEHOLDER_SHADER_HANDLE: ShaderInstanceHandle = ShaderInstanceHandle(
+            BlankShader("Element Shader", errorCallback = {}),
+            BlankMesh("Element Mesh", emptyList(), emptyList(), errorCallback = {}),
+            BlankMaterial("Element Material", emptyList(), errorCallback = {}),
+            0,
+            errorCallback = {}
+        )
+
+        private val SHADER_UNIT_POSITION: ShaderVertexAttributeHandle<Vec2> = ShaderVertexAttributeHandle.vec2("iUnitPosition")
+        private val SHADER_POSITION: ShaderInstanceAttributeHandle<Vec2> = ShaderInstanceAttributeHandle.vec2("iPosition")
+        private val SHADER_SIZE: ShaderInstanceAttributeHandle<Vec2> = ShaderInstanceAttributeHandle.vec2("iSize")
+        private val SHADER_SPEC: ShaderSpec = ShaderSpec()
+            .addVertexAttribute(SHADER_UNIT_POSITION, listOf(Vec2(0.0f, 0.0f), Vec2(1.0f, 0.0f), Vec2(0.0f, -1.0f), Vec2(1.0f, -1.0f)))
+            .addVertexAttribute(ShaderVertexAttributeHandle.vec3("color"), listOf(
+                Vec3(1.0f, 0.0f, 0.0f),
+                Vec3(0.0f, 1.0f, 0.0f),
+                Vec3(0.0f, 0.0f, 1.0f),
+                Vec3(1.0f, 1.0f, 1.0f)
+            ))
+            .addInstanceAttribute(SHADER_POSITION)
+            .addInstanceAttribute(SHADER_SIZE)
+            .addIntermediateAttribute("c", ShaderAttributeType.Vec3)
+            .addOutputAttribute("oColor", ShaderAttributeType.Vec4)
+            .setVertexShaderBody("gl_Position = vec4($SHADER_POSITION + $SHADER_SIZE * $SHADER_UNIT_POSITION, 0.0, 1.0); c = color;")
+            .setFragmentShaderBody("oColor = vec4(c, 1.0);")
     }
 
-    protected var _context: EngineContext = defaultEngineContext
+    protected var _context: EngineContext = DEFAULT_ENGINE_CONTEXT
         private set
 
     private val anchoredPosition: AnchoredPosition = AnchoredPosition(
@@ -32,7 +61,7 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     private var layer: Double = 0.0
 
     private var shaderSpec: ShaderSpec = UIElement.BLANK_SHADER_SPEC
-    private var shaderAttributesData: List<ShaderData> = UIElement.BLANK_SHADER_ATTRIBUTES_DATA
+    private var shaderAttributesData: List<ShaderInstanceData<*>> = UIElement.BLANK_SHADER_ATTRIBUTES_DATA
     protected var _shaderInstanceHandle: ShaderInstanceHandle = UIElement.PLACEHOLDER_SHADER_HANDLE
         private set
 
@@ -57,8 +86,10 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     public fun getPosition(): AnchoredPosition = this.anchoredPosition.copy()
     public fun getSizePercentage(): SizePercentage = this._sizePercentage
     public fun getLayer(): Double = this.layer
-    public fun getShader(): Shader = this._shaderInstanceHandle.shader
     public fun getShaderInstance(): ShaderInstanceHandle = this._shaderInstanceHandle
+    public fun getShader(): Shader = this._shaderInstanceHandle.shader
+    public fun getMesh(): Mesh = this._shaderInstanceHandle.mesh
+    public fun getMaterial(): Material = this._shaderInstanceHandle.material
     public fun getParent(): UIElement<*>? = this.parent
     public fun isVisible(): Boolean = this.isVisible
     public fun getSizeReference(): SizeReference = this.sizeReference
@@ -87,8 +118,8 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     public fun setLayer(layer: Double): T = this.self {
         this.layer = layer
     }
-    public open fun setShader(vararg specs: ShaderSpec, data: List<ShaderData> = emptyList()): T = this.self {
-        this.shaderSpec = ShaderSpec.merge(*specs)
+    public open fun setShader(vararg specs: ShaderSpec, data: List<ShaderInstanceData<*>> = emptyList()): T = this.self {
+        this.shaderSpec = ShaderSpec.merge(UIElement.SHADER_SPEC, *specs)
         this.shaderAttributesData = data
         this.dirtyFlags += DirtyFlags.SHADER
     }
@@ -153,13 +184,13 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
     internal fun reposition(): Unit =  this.onReposition()
     internal fun resize(fullSize: IntSize): Unit = this.onResize(fullSize)
     internal fun commitShaderChange(
-        acquireInstanceHandle: (ShaderSpec) -> ShaderInstanceHandle?,
+        acquireInstanceHandle: (ShaderSpec, UIElement<*>) -> ShaderInstanceHandle?,
         releaseInstanceHandle: (ShaderInstanceHandle) -> Unit
     ): Unit {
-        var instanceHandle: ShaderInstanceHandle? = acquireInstanceHandle(this.shaderSpec)
+        var instanceHandle: ShaderInstanceHandle? = acquireInstanceHandle(this.shaderSpec, this)
         if (instanceHandle == null && this._shaderInstanceHandle == UIElement.PLACEHOLDER_SHADER_HANDLE) {
             this.setToDefaultShader()
-            instanceHandle = acquireInstanceHandle(this.shaderSpec)
+            instanceHandle = acquireInstanceHandle(this.shaderSpec, this)
         }
 
         if (instanceHandle != null) {
@@ -167,6 +198,16 @@ public abstract class UIElement<T : UIElement<T>>(name: String) : NamedObject<T>
             releaseInstanceHandle(previousHandle)
 
             this._shaderInstanceHandle = instanceHandle.setName("ShaderInstanceHandle($this,${instanceHandle.shader})")
+            val x: Int = this._rect.x
+            val y: Int = this._rect.y
+            val w: Int = this._rect.width
+            val h: Int = this._rect.height
+            val glX: Float = (x / 800.0f) * 2.0f - 1.0f
+            val glY: Float = 1.0f - (y / 800.0f) * 2.0f
+            val glW: Float = (w / 800.0f) * 2.0f
+            val glH: Float = (h / 800.0f) * 2.0f
+            this._shaderInstanceHandle.setInstanceAttribute(SHADER_POSITION, Vec2(glX, glY))
+            this._shaderInstanceHandle.setInstanceAttribute(SHADER_SIZE, Vec2(glW, glH))
             this.shaderAttributesData.forEach { it.applyTo(this._shaderInstanceHandle) }
             this.shaderChangeHandlers.toList().forEach { it(previousHandle, this._shaderInstanceHandle) }
         }

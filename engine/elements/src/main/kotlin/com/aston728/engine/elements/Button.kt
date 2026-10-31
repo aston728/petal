@@ -5,11 +5,8 @@ import com.aston728.engine.core.geometry.IntSize
 import com.aston728.engine.core.internals.Image
 import com.aston728.engine.core.internals.devices.Cursor
 import com.aston728.engine.core.internals.devices.MouseButton
-import com.aston728.engine.core.math.Vec2
-import com.aston728.engine.core.rendererBase.ShaderAttributeType
-import com.aston728.engine.core.rendererBase.ShaderData
+import com.aston728.engine.core.rendererBase.ShaderInstanceData
 import com.aston728.engine.core.rendererBase.ShaderSpec
-import com.aston728.engine.core.rendererBase.ShaderVertexAttributeHandle
 import com.aston728.engine.core.utils.Handle
 import kotlin.math.roundToInt
 
@@ -19,13 +16,7 @@ public class Button : UIElement<Button>("Unnamed Button") {
         public val DEFAULT_IMG_HOVERED: Image = Image.DEFAULT_IMG
         public val DEFAULT_IMG_DISABLED: Image = Image.DEFAULT_IMG
 
-        private val SHADER_POSITION: ShaderVertexAttributeHandle<Vec2> = ShaderVertexAttributeHandle.vec2("iPosition")
         private val SHADER_SPEC: ShaderSpec = ShaderSpec()
-            .setName("Button Shader")
-            .addVertexAttribute(this.SHADER_POSITION)
-            .addOutputAttribute("oColor", ShaderAttributeType.Vec4)
-            .setVertexShaderBody("gl_Position = vec4(iPosition, 0.0, 1.0);")
-            .setFragmentShaderBody("oColor = vec4(1.0, 1.0, 1.0, 1.0);")
     }
 
     private var initImgs: List<Image> = listOf(
@@ -38,16 +29,9 @@ public class Button : UIElement<Button>("Unnamed Button") {
     private var isActive: Boolean = true
     private val onClickHandlers: MutableList<(Button) -> Unit> = mutableListOf()
 
-    init {
-        this.addShaderChangeHandler({ _, newInstance ->
-            newInstance
-                .setVertexAttribute(Button.SHADER_POSITION, arrayOf(Vec2(-1.0f, -0.5f), Vec2(-0.5f, -0.5f), Vec2(-0.5f,  0.5f), Vec2(-1.0f,  0.5f)))
-        })
-    }
-
     public fun isActive(): Boolean = this.isActive
 
-    override fun setShader(vararg specs: ShaderSpec, data: List<ShaderData>): Button = apply {
+    override fun setShader(vararg specs: ShaderSpec, data: List<ShaderInstanceData<*>>): Button = apply {
         super.setShader(Button.SHADER_SPEC, *specs, data = data)
     }
     public fun setImgs(
@@ -72,7 +56,7 @@ public class Button : UIElement<Button>("Unnamed Button") {
     override fun onResize(fullSize: IntSize): Unit {
         this._rect.setSize(IntSize(
             (fullSize.width / 100 * this._sizePercentage.width).roundToInt(),
-            (fullSize.height / 100 * this._sizePercentage.height).roundToInt(),
+            (fullSize.height / 100 * this._sizePercentage.height).roundToInt()
         ))
         this.imgs = this.initImgs.map { it.scaledTo(this._rect.getSize()) }
         return super.onResize(fullSize)
@@ -84,7 +68,7 @@ public class Button : UIElement<Button>("Unnamed Button") {
         }
     }
     override fun onUpdate(hoveredElement: UIElement<*>?): Unit {
-        if (this._context.mouse.isJustReleased(MouseButton.LEFT) && hoveredElement == this) { this.click() }
+        if (this._context.mouse.isJustReleased(MouseButton.LEFT) && hoveredElement === this) { this.click() }
         return super.onUpdate(hoveredElement)
     }
 }

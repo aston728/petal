@@ -3,7 +3,7 @@ package com.aston728.engine.core.rendererBase
 import com.aston728.engine.core.utils.NamedObject
 
 public class ShaderSpec private constructor(
-    private var vertexAttributes: MutableList<ShaderVertexAttributeHandle<*>>,
+    private var vertexAttributes: MutableList<ShaderVertexAttributeInfo<*>>,
     private var instanceAttributes: MutableList<ShaderInstanceAttributeHandle<*>>,
     private var intermediateAttributes: MutableList<ShaderAttributeInfo>, private var outputAttributes: MutableList<ShaderAttributeInfo>,
     private var uniforms: MutableList<ShaderUniformInfo<*>>,
@@ -14,7 +14,7 @@ public class ShaderSpec private constructor(
 
     public companion object {
         public fun merge(vararg specs: ShaderSpec): ShaderSpec {
-            val vertexAttributes: MutableList<ShaderVertexAttributeHandle<*>> = mutableListOf<ShaderVertexAttributeHandle<*>>().apply {
+            val vertexAttributes: MutableList<ShaderVertexAttributeInfo<*>> = mutableListOf<ShaderVertexAttributeInfo<*>>().apply {
                 specs.forEach { this.addAll(it.getVertexAttributesUnsafe()) }
             }
             val instanceAttributes: MutableList<ShaderInstanceAttributeHandle<*>> = mutableListOf<ShaderInstanceAttributeHandle<*>>().apply {
@@ -41,18 +41,18 @@ public class ShaderSpec private constructor(
 
             return ShaderSpec(
                 vertexAttributes, instanceAttributes, intermediateAttributes, outputAttributes, uniforms,
-                vertexShaderBody, vertexShaderFooter, fragmentShaderBody, fragmentShaderFooter
-            ).setName(specs.last()._name)
+                vertexShaderBody, vertexShaderFooter, fragmentShaderBody, fragmentShaderFooter,
+            ).setName(specs.last().getName())
         }
     }
 
-    internal fun getVertexAttributesUnsafe(): List<ShaderVertexAttributeHandle<*>> = this.vertexAttributes
+    internal fun getVertexAttributesUnsafe(): List<ShaderVertexAttributeInfo<*>> = this.vertexAttributes
     internal fun getInstanceAttributesUnsafe(): List<ShaderInstanceAttributeHandle<*>> = this.instanceAttributes
     internal fun getIntermediateAttributesUnsafe(): List<ShaderAttributeInfo> = this.intermediateAttributes
     internal fun getOutputAttributesUnsafe(): List<ShaderAttributeInfo> = this.outputAttributes
     internal fun getUniformsUnsafe(): List<ShaderUniformInfo<*>> = this.uniforms
 
-    public fun getVertexAttributes(): List<ShaderVertexAttributeHandle<*>> = this.vertexAttributes.toList()
+    public fun getVertexAttributes(): List<ShaderVertexAttributeInfo<*>> = this.vertexAttributes.toList()
     public fun getInstanceAttributes(): List<ShaderInstanceAttributeHandle<*>> = this.instanceAttributes.toList()
     public fun getIntermediateAttributes(): List<ShaderAttributeInfo> = this.intermediateAttributes.toList()
     public fun getOutputAttributes(): List<ShaderAttributeInfo> = this.outputAttributes.toList()
@@ -72,10 +72,10 @@ public class ShaderSpec private constructor(
         val inputAttributeNamesSeen: HashSet<String> = HashSet()
         val vertexAttributeHandlesSeen: HashSet<ShaderVertexAttributeHandle<*>> = HashSet()
         this.vertexAttributes.forEach {
-            if (!inputAttributeNamesSeen.add(it.name)) {
+            if (!inputAttributeNamesSeen.add(it.handle.name)) {
                 return "$this is invalid, there are multiple input attributes with the name $it"
             }
-            if (!vertexAttributeHandlesSeen.add(it)) {
+            if (!vertexAttributeHandlesSeen.add(it.handle)) {
                 return "$this is invalid, there are multiple vertex attributes with the handle $it"
             }
         }
@@ -117,8 +117,8 @@ public class ShaderSpec private constructor(
         return null
     }
 
-    public fun <T> addVertexAttribute(handle: ShaderVertexAttributeHandle<T>): ShaderSpec = apply {
-        this.vertexAttributes.add(handle)
+    public fun <T> addVertexAttribute(handle: ShaderVertexAttributeHandle<T>, defaultValue: List<T>): ShaderSpec = apply {
+        this.vertexAttributes.add(ShaderVertexAttributeInfo(handle, defaultValue))
     }
     public fun <T> addInstanceAttribute(handle: ShaderInstanceAttributeHandle<T>): ShaderSpec = apply {
         this.instanceAttributes.add(handle)

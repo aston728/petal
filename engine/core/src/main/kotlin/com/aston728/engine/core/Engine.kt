@@ -1,5 +1,7 @@
 package com.aston728.engine.core
 
+import com.aston728.engine.core.elementBase.UIElement
+import com.aston728.engine.core.geometry.IntPosition
 import com.aston728.engine.core.internals.*
 import com.aston728.engine.core.internals.devices.Key
 import com.aston728.engine.core.internals.devices.KeyboardController
@@ -21,7 +23,7 @@ private fun centerString(string: String, fillChar: Char, size: Int): String {
 public class Engine private constructor(config: EngineConfig) {
     public companion object {
         private var instance: Engine? = null
-        public fun create(config: EngineConfig): Engine {
+        public fun create(config: EngineConfig = DEFAULT_ENGINE_CONFIG): Engine {
             if (this.instance != null) {
                 this.instance!!.logger.error("ENGINE", "Cannot create more than one engine instance")
             } else {
@@ -44,16 +46,17 @@ public class Engine private constructor(config: EngineConfig) {
 
     private val logger: FrozenLogger = this.createLogger(config.engineMode)
     private val runtime: Runtime = Runtime()
-    private val renderManager: RenderManager = this.createRenderManager(config.graphicsApi, config.engineMode == EngineMode.DEBUG)
 
     private val mouse: MouseController = MouseController()
     private val keyboard: KeyboardController = KeyboardController()
     private val eventManager: EventManager = EventManager()
-    private val shaderManager: ShaderManager = ShaderManager(
-        this.renderManager::buildShader,
-        errorCallback = { message -> this.logger.error("SHADER", message) }
-    )
+    private val renderManager: RenderManager = this.createRenderManager(config.graphicsApi, config.engineMode == EngineMode.DEBUG)
     private val context: EngineContext = this.createContext(config.engineMode)
+
+    private val shaderManager: ShaderManager = ShaderManager(
+        this.logger,
+        this.renderManager::buildShader, this.renderManager::buildMesh, this.renderManager::buildMaterial
+    )
 
     init {
         this.context.eventSubscriber.subscribe(KeyPressedEvent::class, { event -> when (event.key) {
@@ -97,7 +100,8 @@ public class Engine private constructor(config: EngineConfig) {
             this.mouse, this.keyboard,
             MonitorService(), TimeService(), clipboard,
             this.eventManager, AssetManager(this.logger),
-            this.logger, isDebugOn = (engineMode == EngineMode.DEBUG),
+            BackendInfo(), this.renderManager, isDebugOn = (engineMode == EngineMode.DEBUG),
+            logger = this.logger,
         )
     }
 
@@ -162,8 +166,11 @@ public class Engine private constructor(config: EngineConfig) {
     }
     private fun initWindow(window: Window): Unit {
         val internalWindow: InternalWindow = window.getInternalWindow()
+        val position: IntPosition =
+            if (this.context.backendInfo.getPlatform().hasFullWindowControl()) { internalWindow.getPosition() }
+            else { internalWindow.getSavedPosition() }
         // not triggered automatically
-        this.eventManager.addEvent(WindowMoveEvent(window, internalWindow.getPosition()))
+        this.eventManager.addEvent(WindowMoveEvent(window, position))
         this.eventManager.addEvent(WindowResizeEvent(window, internalWindow.getSize()))
         if (internalWindow.isMinimized()) { this.eventManager.addEvent(WindowMinimizeEvent(window)) }
         else { this.eventManager.addEvent(WindowUnminimizeEvent(window)) }
@@ -298,7 +305,9 @@ public class Engine private constructor(config: EngineConfig) {
             this.focusedWindow?.setCursor(this.focusedWindow?.getUI()?.getHoveredElement()?.getCursorType())
             this.focusedWindow?.getUI()?.update()
 
-            this.windows.forEach { this.renderManager.render(it, it.getUI()?.getRenderCommands() ?: emptyList()) }
+            val allElements: MutableList<List<UIElement<*>>> = mutableListOf()
+            this.windows.forEach { allElements.add(it.getUI()?.getElements() ?: emptyList()) }
+            this.windows.forEach { this.renderManager.render(it, it.getUI()?.getRenderCommands(allElements) ?: emptyList()) }
 
             this.windows.forEach { it.handleUIDirtyFlags(this.shaderManager::acquire, this.shaderManager::release) }
             this.fps++

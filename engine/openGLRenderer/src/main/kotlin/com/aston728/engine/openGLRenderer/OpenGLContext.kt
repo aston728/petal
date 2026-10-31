@@ -1,7 +1,7 @@
 package com.aston728.engine.openGLRenderer
 
 import com.aston728.engine.core.geometry.IntSize
-import com.aston728.engine.core.rendererBase.Shader
+import com.aston728.engine.core.rendererBase.Mesh
 import org.lwjgl.glfw.GLFW.glfwMakeContextCurrent
 import org.lwjgl.glfw.GLFW.glfwSwapBuffers
 import org.lwjgl.opengl.*
@@ -23,12 +23,12 @@ internal class OpenGLContext private constructor(private val handle: Long, priva
     }
 
     private val textureBindings: IntArray by lazy {
-        IntArray(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS - GL_TEXTURE0 - 1) { 0 }
+        IntArray(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS - 1) { 0 }
     }
     private val samplerBindings: IntArray by lazy {
-        IntArray(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS - GL_TEXTURE0 - 1) { 0 }
+        IntArray(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS - 1) { 0 }
     }
-    private val shaderStates: IdentityHashMap<OpenGLShader, OpenGLShaderState> = IdentityHashMap()
+    private val meshStates: IdentityHashMap<OpenGLMesh, OpenGLMeshState> = IdentityHashMap()
 
     private fun formatDebugMessageNormal(source: Int, type: Int, severity: Int, messageLength: Int, message: Long): String {
         val sourceString: String = when (source) {
@@ -152,6 +152,11 @@ internal class OpenGLContext private constructor(private val handle: Long, priva
             messageCallback("Failed to set a debug message callback, debug message callbacks are not supported")
         }
     }
+    internal fun free(): Unit {
+        glfwMakeContextCurrent(this.handle)
+        GL.setCapabilities(this.capabilities)
+        this.meshStates.values.forEach { it.free() }
+    }
 
     internal fun getHandle(): Long = this.handle
 
@@ -168,15 +173,16 @@ internal class OpenGLContext private constructor(private val handle: Long, priva
         glfwSwapBuffers(this.handle)
     }
 
-    internal fun getOrPutShaderState(
-        shader: OpenGLShader, defaultValue: () -> OpenGLShaderState
-    ): OpenGLShaderState = this.shaderStates.getOrPut(shader, defaultValue)
-    internal fun destroyShaderState(shader: Shader): Unit {
+    internal fun getOrPutMeshState(
+        mesh: OpenGLMesh, defaultValue: () -> OpenGLMeshState
+    ): OpenGLMeshState = this.meshStates.getOrPut(mesh, defaultValue)
+    internal fun freeMeshState(mesh: Mesh): Unit {
         glfwMakeContextCurrent(this.handle)
         GL.setCapabilities(this.capabilities)
-        this.shaderStates[shader]?.destroy()
-        this.shaderStates.remove(shader)
+        this.meshStates[mesh]?.free()
+        this.meshStates.remove(mesh)
     }
+
     internal fun bindTexture(unit: Int, texture: Int, textureType: Int, sampler: Int): Unit {
         if (this.textureBindings[unit] != texture) {
             glActiveTexture(GL_TEXTURE0 + unit)
@@ -187,11 +193,5 @@ internal class OpenGLContext private constructor(private val handle: Long, priva
             glBindSampler(unit, sampler)
             this.samplerBindings[unit] = sampler
         }
-    }
-
-    internal fun free(): Unit {
-        glfwMakeContextCurrent(this.handle)
-        GL.setCapabilities(this.capabilities)
-        this.shaderStates.values.forEach { it.destroy() }
     }
 }

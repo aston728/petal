@@ -1,5 +1,6 @@
 package com.aston728.engine.core
 
+import com.aston728.engine.core.elementBase.UIElement
 import com.aston728.engine.core.geometry.*
 import com.aston728.engine.core.internals.Image
 import com.aston728.engine.core.internals.InternalWindow
@@ -116,7 +117,7 @@ public class Window internal constructor(private var context: EngineContext) : N
     }
     internal fun setCursor(cursor: Cursor?): Unit {
         val cursor: Cursor = this.topLevelCursor ?: cursor ?: this.defaultCursor
-        if (cursor != this.internalWindow.getCursor()) { this.internalWindow.setCursor(cursor) }
+        if (this.internalWindow.getCursor() !== cursor) { this.internalWindow.setCursor(cursor) }
     }
 
     public fun setTitle(title: String): Window = this.safeSet("title") {
@@ -132,21 +133,17 @@ public class Window internal constructor(private var context: EngineContext) : N
         val monitorInfo: MonitorInfo? =
             if (monitorI == null) { this.getMonitorInfo() }
             else { this.context.monitors.getInfoAtIndex(monitorI) }
-        if (monitorInfo != null) {
-            val monitorPosition: IntPosition = monitorInfo.getRect().getTopLeft()
-            this.internalWindow.setPosition(monitorPosition + position)
-        }
+        val monitorPosition: IntPosition = monitorInfo?.getRect()?.getTopLeft() ?: IntPosition()
+        this.internalWindow.setPosition(monitorPosition + position)
     }
     public fun setPosition(coordinate: Coordinate, monitorI: Int? = null): Window = this.safeSet("position") {
         val monitorInfo: MonitorInfo? =
             if (monitorI == null) { this.getMonitorInfo() }
             else { this.context.monitors.getInfoAtIndex(monitorI) }
-        if (monitorInfo != null) {
-            val monitorRect: Rect = monitorInfo.getUsableRect()
-            val windowRect: Rect = this.internalWindow.getSavedRect()
-            windowRect.setByCoordinate(coordinate, monitorRect.getByCoordinate(coordinate))
-            this.internalWindow.setPosition(windowRect.getTopLeft())
-        }
+        val monitorRect: Rect = monitorInfo?.getUsableRect() ?: Rect()
+        val windowRect: Rect = this.internalWindow.getSavedRect()
+        windowRect.setByCoordinate(coordinate, monitorRect.getByCoordinate(coordinate))
+        this.internalWindow.setPosition(windowRect.getTopLeft())
     }
     public fun setInitialSize(size: IntSize): Window = this.safeSet("initial size") {
         this.initialSize = size
@@ -288,7 +285,8 @@ public class Window internal constructor(private var context: EngineContext) : N
             isMinimized = false, isMaximized = false, isFullscreen = false,
             monitorInfo = null
         )
-        this.setSize(this.initialSize).setPosition(Coordinate.CENTER)
+        this.setSize(this.initialSize)
+        if (this.context.backendInfo.getPlatform().hasFullWindowControl()) { this.setPosition(Coordinate.CENTER) }
     }
 
     internal fun onCloseRequest(): Unit {}
@@ -313,7 +311,7 @@ public class Window internal constructor(private var context: EngineContext) : N
     }
 
     internal fun handleUIDirtyFlags(
-        acquireInstanceHandle: (ShaderSpec) -> ShaderInstanceHandle?,
+        acquireInstanceHandle: (ShaderSpec, UIElement<*>) -> ShaderInstanceHandle?,
         releaseInstanceHandle: (ShaderInstanceHandle) -> Unit
     ): Unit {
         val rect: Rect = Rect(IntPosition(0, 0), this.internalWindow.getSize())

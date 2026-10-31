@@ -23,7 +23,9 @@ internal class InternalWindow(isDebugOn: Boolean) {
     // TODO: how to content scale
     private var handle: Long = this.create(isDebugOn)
 
-    private var savedPosition: IntPosition = if (this.exists()) { this.getPosition() } else { IntPosition() }
+    private var savedPosition: IntPosition =
+        if (this.exists() && glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) { this.getPosition() }
+        else { IntPosition() }
     private var savedSize: IntSize = if (this.exists()) { this.getSize() } else { IntSize() }
     private var minimumSize: IntSize? = null
     private var maximumSize: IntSize? = null
@@ -167,8 +169,10 @@ internal class InternalWindow(isDebugOn: Boolean) {
             val frameSize: BorderSize = this.getFrameSize()
             glfwSetWindowPos(this.handle, this.savedPosition.x + frameSize.left, this.savedPosition.y + frameSize.top)
 
-            val actualPosition: IntPosition = this.getPosition()
-            if (actualPosition != this.savedPosition) { this.savedPosition = actualPosition }
+            if (glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) {
+                val actualPosition: IntPosition = this.getPosition()
+                if (this.savedPosition != actualPosition) { this.savedPosition = actualPosition }
+            }
         }
     }
     internal fun setSize(size: IntSize): Unit {
@@ -177,7 +181,7 @@ internal class InternalWindow(isDebugOn: Boolean) {
             glfwSetWindowSize(this.handle, this.savedSize.width, this.savedSize.height)
 
             val actualSize: IntSize = this.getSize()
-            if (actualSize != this.savedSize) { this.savedSize = actualSize }
+            if (this.savedSize != actualSize) { this.savedSize = actualSize }
         }
     }
     internal fun setMinimumSize(size: IntSize?): Unit {
@@ -294,7 +298,7 @@ internal class InternalWindow(isDebugOn: Boolean) {
 
     internal fun setModes(
         isMinimized: Boolean, isMaximized: Boolean, isFullscreen: Boolean,
-        monitorInfo: MonitorInfo?,
+        monitorInfo: MonitorInfo?
     ): Unit {
         // Reset states and apply new ones
 
@@ -311,7 +315,7 @@ internal class InternalWindow(isDebugOn: Boolean) {
             this.isMinimized = false
         }
         this.setSize(this.savedSize)
-        this.setPosition(this.savedPosition)
+        if (glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) { this.setPosition(this.savedPosition) }
 
         this.isMinimized = isMinimized
         this.isMaximized = isMaximized
@@ -324,7 +328,7 @@ internal class InternalWindow(isDebugOn: Boolean) {
                 this.handle, monitorInfo.getHandle(),
                 0, 0,
                 monitorInfo.getRect().width, monitorInfo.getRect().height,
-                monitorInfo.getRefreshRate(),
+                monitorInfo.getRefreshRate()
             )
         }
         if (this.isMinimized) {
@@ -378,12 +382,12 @@ internal class InternalWindow(isDebugOn: Boolean) {
 
         if (this.didUnminimize) {
             this.setSize(this.savedSize)
-            this.setPosition(this.savedPosition)
+            if (glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) { this.setPosition(this.savedPosition) }
             this.didUnminimize = false
         }
         if (this.didUnmaximize) {
             this.setSize(this.savedSize)
-            this.setPosition(this.savedPosition)
+            if (glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) { this.setPosition(this.savedPosition) }
             this.didUnmaximize = false
         }
     }

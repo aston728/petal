@@ -14,7 +14,7 @@ import java.util.*
 
 
 public class UI : NamedObject<UI>("Unnamed UI") {
-    private var context: EngineContext = defaultEngineContext
+    private var context: EngineContext = DEFAULT_ENGINE_CONTEXT
 
     private val elements: MutableSet<UIElement<*>> = Collections.newSetFromMap(IdentityHashMap())
     private val anchorMappings: IdentityHashMap<UIElement<*>, MutableSet<UIElement<*>>> = IdentityHashMap()
@@ -23,6 +23,8 @@ public class UI : NamedObject<UI>("Unnamed UI") {
     private var hoveredElement: UIElement<*>? = null
 
     private var backgroundColor: Color = Color.BLACK
+
+    internal fun getElements() = this.elements.toList() // TODO
 
     public fun getAnchoredTo(element: UIElement<*>): List<UIElement<*>> = this.anchorMappings.getOrDefault(element, emptySet()).toList()
     public fun getChildrenOf(element: UIElement<*>): List<UIElement<*>> = this.parentMappings.getOrDefault(element, emptySet()).toList()
@@ -62,9 +64,9 @@ public class UI : NamedObject<UI>("Unnamed UI") {
 
         val info: MutableList<UIElement<*>> = mutableListOf(target)
         var currentTarget: UIElement<*>? = target.getPositionUnsafe().getAnchorUnsafe().getTarget()
-        while (currentTarget != null) {
+        while (currentTarget !== null) {
             info.add(currentTarget)
-            if (target == currentTarget) { return info }
+            if (currentTarget === target) { return info }
             currentTarget = currentTarget.getPositionUnsafe().getAnchorUnsafe().getTarget()
         }
 
@@ -88,7 +90,7 @@ public class UI : NamedObject<UI>("Unnamed UI") {
             } else {
                 val desiredTarget: UIElement<*>? = desiredAnchor.getTarget()
                 this.anchorMappings[target]?.remove(target)
-                if (desiredTarget != null) {
+                if (desiredTarget !== null) {
                     val anchoredElements: MutableSet<UIElement<*>> = this.anchorMappings.getOrPut(desiredTarget) {
                         Collections.newSetFromMap(IdentityHashMap())
                     }
@@ -108,9 +110,9 @@ public class UI : NamedObject<UI>("Unnamed UI") {
     private fun checkParentLoop(element: UIElement<*>): List<UIElement<*>>? {
         val info: MutableList<UIElement<*>> = mutableListOf(element)
         var currentParent: UIElement<*>? = element.getDesiredParent()
-        while (currentParent != null) {
+        while (currentParent !== null) {
             info.add(currentParent)
-            if (element == currentParent) { return info }
+            if (currentParent === element) { return info }
             currentParent = currentParent.getParent()
         }
 
@@ -133,7 +135,7 @@ public class UI : NamedObject<UI>("Unnamed UI") {
                 element.discardParentChange()
             } else {
                 this.parentMappings[parent]?.remove(element)
-                if (desiredParent != null) {
+                if (desiredParent !== null) {
                     val children: MutableSet<UIElement<*>> = this.parentMappings.getOrPut(desiredParent) {
                         Collections.newSetFromMap(IdentityHashMap())
                     }
@@ -168,7 +170,7 @@ public class UI : NamedObject<UI>("Unnamed UI") {
             if (DirtyFlags.SIZE in element.getDirtyFlags()) {
                 val parent: UIElement<*>? = element.getParent()
                 val fullSize: IntSize =
-                    if (parent == null || element.getSizeReference() == SizeReference.WINDOW) { windowSize }
+                    if (parent === null || element.getSizeReference() == SizeReference.WINDOW) { windowSize }
                     else { parent.getRectUnsafe().getSize() }
                 element.resize(fullSize)
             }
@@ -176,8 +178,8 @@ public class UI : NamedObject<UI>("Unnamed UI") {
         }
     }
     internal fun handleDirtyShaders(
-        acquireInstanceHandle: (ShaderSpec) -> ShaderInstanceHandle?,
-        releaseInstanceHandle: (ShaderInstanceHandle) -> Unit,
+        acquireInstanceHandle: (ShaderSpec, UIElement<*>) -> ShaderInstanceHandle?,
+        releaseInstanceHandle: (ShaderInstanceHandle) -> Unit
     ): UI = apply {
         for (element in this.elements) {
             if (DirtyFlags.SHADER in element.getDirtyFlags()) { element.commitShaderChange(acquireInstanceHandle, releaseInstanceHandle) }
@@ -194,26 +196,32 @@ public class UI : NamedObject<UI>("Unnamed UI") {
             if (it.isVisible()) { it.update(this.hoveredElement) }
         }
     }
-    internal fun getRenderCommands(): List<RenderCommand> {
+    internal fun getRenderCommands(allElements: List<List<UIElement<*>>>): List<RenderCommand> {
         val elements: List<UIElement<*>> = this.elements.filter { it.isVisible() }.sortedBy { it.getLayer() }
         val renderCommands: MutableList<RenderCommand> = mutableListOf(ClearCommand(this.backgroundColor))
         if (elements.isEmpty()) { return renderCommands }
 
         var currentShader: Shader = elements[0].getShader()
+        var currentMesh: Mesh = elements[0].getMesh()
+        var currentMaterial: Material = elements[0].getMaterial()
+        currentMesh.sortData(allElements)
         val indexes: MutableList<Int> = mutableListOf()
         for (element in elements) {
-            if (element.getShader() != currentShader) {
-                renderCommands.add(BindShaderCommand(currentShader))
+            if (currentShader !== element.getShader()) {
+                renderCommands.add(BindCommand(currentShader, currentMesh, currentMaterial))
                 renderCommands.add(
                     if (indexes.size == 1) { DrawCommand(indexes[0]) }
                     else { MultiDrawCommand(indexes.toList()) }
                 )
                 currentShader = element.getShader()
+                currentMesh = element.getMesh()
+                currentMaterial = element.getMaterial()
+                currentMesh.sortData(allElements)
                 indexes.clear()
             }
             indexes.add(element.getShaderInstance().instanceI)
         }
-        renderCommands.add(BindShaderCommand(currentShader))
+        renderCommands.add(BindCommand(currentShader, currentMesh, currentMaterial))
         renderCommands.add(
             if (indexes.size == 1) { DrawCommand(indexes[0]) }
             else { MultiDrawCommand(indexes) }

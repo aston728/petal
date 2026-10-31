@@ -16,4 +16,4 @@ public data class ShaderSampler(
     public val maxLOD: Float = 1000.0f,
 )
 
-public val SHADER_DEFAULT_SAMPLER: ShaderSampler = ShaderSampler()
+public val DEFAULT_SHADER_SAMPLER: ShaderSampler = ShaderSampler()

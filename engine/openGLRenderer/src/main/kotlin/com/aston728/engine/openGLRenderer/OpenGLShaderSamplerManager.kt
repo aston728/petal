@@ -14,6 +14,15 @@ internal class OpenGLShaderSamplerManager {
     private val texture2DArrayMappings: MutableMap<List<Image>, Int> = mutableMapOf()
     private val samplerMappings: MutableMap<ShaderSampler, Int> = mutableMapOf()
 
+    internal fun free(): Unit {
+        this.texture2DMappings.values.forEach { glDeleteTextures(it) }
+        this.texture2DMappings.clear()
+        this.texture2DArrayMappings.values.forEach { glDeleteTextures(it) }
+        this.texture2DArrayMappings.clear()
+        this.samplerMappings.values.forEach { glDeleteSamplers(it) }
+        this.samplerMappings.clear()
+    }
+
     internal fun getTexture2D(img: Image): Int = this.texture2DMappings.getOrPut(img) {
         val texture: Int = glGenTextures()
         glBindTexture(GL_TEXTURE_2D, texture)
@@ -64,14 +73,5 @@ internal class OpenGLShaderSamplerManager {
         glSamplerParameterf(glSampler, GL_TEXTURE_MIN_LOD, sampler.minLOD)
         glSamplerParameterf(glSampler, GL_TEXTURE_MAX_LOD, sampler.maxLOD)
         glSampler
-    }
-
-    internal fun free(): Unit {
-        this.texture2DMappings.values.forEach { glDeleteTextures(it) }
-        this.texture2DMappings.clear()
-        this.texture2DArrayMappings.values.forEach { glDeleteTextures(it) }
-        this.texture2DArrayMappings.clear()
-        this.samplerMappings.values.forEach { glDeleteSamplers(it) }
-        this.samplerMappings.clear()
     }
 }

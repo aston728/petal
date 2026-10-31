@@ -23,7 +23,7 @@ public class Anchor private constructor(
     public fun getDepth(): Int {
         var depth: Int = 0
         var target: UIElement<*>? = this.target
-        while (target != null) {
+        while (target !== null) {
             target = target.getPositionUnsafe().getAnchorUnsafe().getTarget()
             depth++
         }

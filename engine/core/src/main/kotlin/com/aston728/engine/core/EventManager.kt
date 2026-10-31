@@ -97,8 +97,8 @@ internal class EventManager : EventSubscriber {
         }
         this.events.retainAll {
             when (it) {
-                is WindowMoveEvent -> it === windowMoveEventMap[it.window]
-                is WindowResizeEvent -> it === windowResizeEventMap[it.window]
+                is WindowMoveEvent -> it == windowMoveEventMap[it.window]
+                is WindowResizeEvent -> it == windowResizeEventMap[it.window]
                 else -> true
             }
         }

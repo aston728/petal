@@ -7,7 +7,7 @@ import java.nio.ByteOrder
 
 public class Image private constructor(private val width: Int, private val height: Int, private val pixels: ByteBuffer) {
     public companion object {
-        public val DEFAULT_IMG: Image = Image(
+        public var DEFAULT_IMG: Image = Image(
             2, 2,
             ByteBuffer
                 .allocateDirect(16)
@@ -20,6 +20,7 @@ public class Image private constructor(private val width: Int, private val heigh
                 ))
                 .rewind()
         )
+
         internal fun load(path: String, errorCallback: (String) -> Unit): Image {
             val bytes: ByteArray? = Image::class.java.getResourceAsStream("/$path")?.use { it.readBytes() }
             if (bytes == null) {
