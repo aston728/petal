@@ -183,6 +183,9 @@ internal class OpenGLContext private constructor(private val handle: Long, priva
         this.meshStates.remove(mesh)
     }
 
+    internal fun invalidateTextureUnit(unit: Int): Unit {
+        this.textureBindings[unit] = -1
+    }
     internal fun bindTexture(unit: Int, texture: Int, textureType: Int, sampler: Int): Unit {
         if (this.textureBindings[unit] != texture) {
             glActiveTexture(GL_TEXTURE0 + unit)

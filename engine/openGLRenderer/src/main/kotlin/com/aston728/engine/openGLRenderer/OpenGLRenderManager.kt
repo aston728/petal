@@ -63,7 +63,7 @@ internal class OpenGLRenderManager : RenderManager() {
         spec.getName(),
         spec.getUniforms(), this.samplerManager,
         errorCallback,
-        contextProvider = { this.currentContext },
+        contextProvider = { this.currentContext }, contextsProvider = { this.contexts },
         programProvider = { shader -> this.shaderMappings.getOrDefault(shader, OpenGLShader.INVALID_PROGRAM) }
     )
 

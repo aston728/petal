@@ -6,42 +6,72 @@ import com.aston728.engine.core.rendererBase.ShaderSampler
 import com.aston728.engine.core.rendererBase.ShaderSamplerAddressMode
 import com.aston728.engine.core.rendererBase.ShaderSamplerFilter
 import com.aston728.engine.core.rendererBase.ShaderSamplerMipmapMode
+import com.aston728.engine.core.utils.Handle
 import org.lwjgl.opengl.GL33C.*
 import org.lwjgl.system.MemoryUtil.NULL
 
 internal class OpenGLShaderSamplerManager {
-    private val texture2DMappings: MutableMap<Image, Int> = mutableMapOf()
-    private val texture2DArrayMappings: MutableMap<List<Image>, Int> = mutableMapOf()
+    private val texture2DMappings: MutableMap<Image, OpenGLTexture> = mutableMapOf()
+    private val texture2DArrayMappings: MutableMap<List<Image>, OpenGLTexture> = mutableMapOf()
     private val samplerMappings: MutableMap<ShaderSampler, Int> = mutableMapOf()
 
     internal fun free(): Unit {
-        this.texture2DMappings.values.forEach { glDeleteTextures(it) }
+        this.texture2DMappings.values.forEach { it.free() }
         this.texture2DMappings.clear()
-        this.texture2DArrayMappings.values.forEach { glDeleteTextures(it) }
+        this.texture2DArrayMappings.values.forEach { it.free() }
         this.texture2DArrayMappings.clear()
         this.samplerMappings.values.forEach { glDeleteSamplers(it) }
         this.samplerMappings.clear()
     }
 
-    internal fun getTexture2D(img: Image): Int = this.texture2DMappings.getOrPut(img) {
-        val texture: Int = glGenTextures()
-        glBindTexture(GL_TEXTURE_2D, texture)
+    internal fun getTexture2D(img: Image): OpenGLTexture = this.texture2DMappings.getOrPut(img) {
+        val texture: OpenGLTexture = OpenGLTexture(glGenTextures())
+        glBindTexture(GL_TEXTURE_2D, texture.value)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.getWidth(), img.getHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixels())
         glGenerateMipmap(GL_TEXTURE_2D)
+
+        val textureRefreshHandle: Handle = Handle()
+        img.addOnChangeHandler({
+            texture.updateQueue.add {
+                glBindTexture(GL_TEXTURE_2D, it.value)
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.getWidth(), img.getHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixels())
+                glGenerateMipmap(GL_TEXTURE_2D)
+            }
+        }, textureRefreshHandle)
+        texture.onFreeHandlers.add { textureRefreshHandle.remove() }
+
         texture
     }
-    internal fun getTexture2DArray(imgs: List<Image>): Int = this.texture2DArrayMappings.getOrPut(imgs) {
+    internal fun getTexture2DArray(imgs: List<Image>): OpenGLTexture = this.texture2DArrayMappings.getOrPut(imgs) {
         val width: Int = (imgs.maxBy { it.getWidth() }).getWidth()
         val height: Int = (imgs.maxBy { it.getHeight() }).getHeight()
-        val imgs: List<Image> = imgs.map { it.scaledTo(IntSize(width, height)) }
 
-        val texture: Int = glGenTextures()
-        glBindTexture(GL_TEXTURE_2D_ARRAY, texture)
+        val texture: OpenGLTexture = OpenGLTexture(glGenTextures())
+        glBindTexture(GL_TEXTURE_2D_ARRAY, texture.value)
         glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, width, height, imgs.size, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL)
         imgs.forEachIndexed { i, img ->
-            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixels())
+            glTexSubImage3D(
+                GL_TEXTURE_2D_ARRAY, 0, 0, 0, i,
+                width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.scaledTo(IntSize(width, height)).getPixels()
+            )
         }
         glGenerateMipmap(GL_TEXTURE_2D_ARRAY)
+
+        imgs.forEachIndexed { i, img ->
+            val textureRefreshHandle: Handle = Handle()
+            img.addOnChangeHandler({
+                texture.updateQueue.add {
+                    glBindTexture(GL_TEXTURE_2D_ARRAY, it.value)
+                    glTexSubImage3D(
+                        GL_TEXTURE_2D_ARRAY, 0, 0, 0, i,
+                        width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.scaledTo(IntSize(width, height)).getPixels()
+                    )
+                    glGenerateMipmap(GL_TEXTURE_2D_ARRAY)
+                }
+            }, textureRefreshHandle)
+            texture.onFreeHandlers.add { textureRefreshHandle.remove() }
+        }
+
         texture
     }
 

@@ -99,7 +99,7 @@ public class Engine private constructor(config: EngineConfig) {
         return EngineContext(
             this.mouse, this.keyboard,
             MonitorService(), TimeService(), clipboard,
-            this.eventManager, AssetManager(this.logger),
+            this.eventManager, AssetLoader(this.logger),
             BackendInfo(), this.renderManager, isDebugOn = (engineMode == EngineMode.DEBUG),
             logger = this.logger,
         )

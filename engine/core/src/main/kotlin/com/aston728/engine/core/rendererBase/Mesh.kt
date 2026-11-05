@@ -128,14 +128,6 @@ public abstract class Mesh(
         this.instanceAttributesUpdateQueue.add(ShaderInstanceAttributeUpdateInfo(handle, updater, instanceI, value))
     }
 
-    public fun print(data: ByteBuffer) {
-        println("--------------")
-        for (i in 0..<8) {
-            println(data.getFloat(i * 4))
-        }
-        println("--------------")
-    }
-
     internal fun sortData(allElements: List<List<UIElement<*>>>): Unit {
         val newInstanceData: ByteBuffer = ByteBuffer
             .allocateDirect(this._instanceDataStrideSize * allElements.sumOf { it.size })

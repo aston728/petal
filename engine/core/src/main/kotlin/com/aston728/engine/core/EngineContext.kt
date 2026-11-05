@@ -14,7 +14,7 @@ import com.aston728.engine.core.rendererBase.RenderManager
 public class EngineContext internal constructor(
     public val mouse: Mouse, public val keyboard: Keyboard,
     public val monitors: MonitorService, public val time: TimeService, public val clipboard: ClipboardService,
-    public val eventSubscriber: EventSubscriber, public val assetManager: AssetManager,
+    public val eventSubscriber: EventSubscriber, public val assetLoader: AssetLoader,
     public val backendInfo: BackendInfo, public val renderManager: RenderManager, public val isDebugOn: Boolean,
     public val logger: FrozenLogger,
 )
@@ -24,7 +24,7 @@ internal const val DEFAULT_IS_DEBUG_ON: Boolean = false
 internal val DEFAULT_ENGINE_CONTEXT: EngineContext = EngineContext(
     MouseController(), KeyboardController(),
     MonitorService(), TimeService(), ClipboardService(),
-    EventManager(), AssetManager(Logger()),
+    EventManager(), AssetLoader(DEFAULT_LOGGER),
     BackendInfo(), BlankRenderManager(), DEFAULT_IS_DEBUG_ON,
     DEFAULT_LOGGER,
 )

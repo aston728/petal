@@ -3,6 +3,7 @@ package com.aston728.engine.openGLRenderer
 import com.aston728.engine.core.rendererBase.Shader
 import org.lwjgl.opengl.GL33C.*
 
+// TODO: better error reports
 internal class OpenGLShader(
     name: String, errorCallback: (String) -> Unit,
     vertexSource: String, fragmentSource: String,

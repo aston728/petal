@@ -1,5 +1,8 @@
 package com.aston728.engine.core
 
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
+
 public class LoggerFatalError : RuntimeException()
 public class Logger : FrozenLogger {
     private var shouldShowInfo: Boolean = true
@@ -8,6 +11,7 @@ public class Logger : FrozenLogger {
 
     private var format: (String, String, String) -> String = { severity: String, tag: String, message: String -> "[$tag] $severity: $message" }
     private var log: (String) -> Unit = { message -> System.err.println(message) }
+    private var logLock: ReentrantLock = ReentrantLock()
 
     override fun areInfoEnabled(): Boolean = this.shouldShowInfo
     override fun areWarningsEnabled(): Boolean = this.shouldShowWarnings
@@ -30,16 +34,26 @@ public class Logger : FrozenLogger {
     }
 
     override fun info(tag: String, message: String): Logger = apply {
-        if (this.shouldShowInfo) { this.log(this.format("INFO", tag, message)) }
+        if (this.shouldShowInfo) {
+            val formattedMessage: String = this.format("INFO", tag, message)
+            this.logLock.withLock { this.log(formattedMessage) }
+        }
     }
     override fun warn(tag: String, message: String): Logger = apply {
-        if (this.shouldShowWarnings) { this.log(this.format("WARNING", tag, message)) }
+        if (this.shouldShowWarnings) {
+            val formattedMessage: String = this.format("WARNING", tag, message)
+            this.logLock.withLock { this.log(formattedMessage) }
+        }
     }
     override fun error(tag: String, message: String): Logger = apply {
-        if (this.shouldShowErrors) { this.log(this.format("ERROR", tag, message)) }
+        if (this.shouldShowErrors) {
+            val formattedMessage: String = this.format("ERROR", tag, message)
+            this.logLock.withLock { this.log(formattedMessage) }
+        }
     }
     override fun fatalError(tag: String, message: String): Nothing {
-        this.log(this.format("FATAL ERROR", tag, message))
+        val formattedMessage: String = this.format("ERROR", tag, message)
+        this.logLock.withLock { this.log(formattedMessage) }
         throw LoggerFatalError()
     }
 }

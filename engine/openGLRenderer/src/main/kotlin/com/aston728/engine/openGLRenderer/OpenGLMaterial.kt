@@ -8,13 +8,13 @@ import org.lwjgl.opengl.GL21C.*
 import org.lwjgl.opengl.GL30C.*
 
 private fun boolToInt(bool: Boolean): Int = if (bool) { 1 } else { 0 }
-private class OpenGLShaderTextureBinding(var texture: Int, var type: Int, var sampler: Int)
+private class OpenGLShaderTextureBinding(var texture: OpenGLTexture, var type: Int, var sampler: Int)
 
 internal class OpenGLMaterial(
     name: String,
     uniforms: List<ShaderUniformInfo<*>>, private val samplerManager: OpenGLShaderSamplerManager,
     errorCallback: (String) -> Unit,
-    private val contextProvider: () -> OpenGLContext,
+    private val contextProvider: () -> OpenGLContext, private val contextsProvider: () -> List<OpenGLContext>,
     private val programProvider: (Shader) -> Int, // TODO
 ) : Material(name, uniforms, errorCallback) {
     private var uniformMappings: Map<ShaderUniformHandle<*>, Int> = emptyMap()
@@ -28,7 +28,7 @@ internal class OpenGLMaterial(
         }
     }}
     private val textureBindings: Array<OpenGLShaderTextureBinding> by lazy {
-        Array(this.textureUnitMappings.size) { OpenGLShaderTextureBinding(0, 0, 0) }
+        Array(this.textureUnitMappings.size) { OpenGLShaderTextureBinding(OpenGLTexture(0), 0, 0) }
     }
 
     override fun onAssignShader(shader: Shader) {
@@ -42,8 +42,14 @@ internal class OpenGLMaterial(
     }
     override fun onBind(): Unit {
         val context: OpenGLContext = this.contextProvider()
+        val contexts: List<OpenGLContext> = this.contextsProvider()
         this.textureBindings.forEachIndexed { i, binding ->
-            context.bindTexture(i, binding.texture, binding.type, binding.sampler)
+            if (binding.texture.updateQueue.isNotEmpty()) {
+                binding.texture.updateQueue.forEach { it(binding.texture) }
+                contexts.forEach { it.invalidateTextureUnit(i) }
+                binding.texture.updateQueue.clear()
+            }
+            context.bindTexture(i, binding.texture.value, binding.type, binding.sampler)
         }
     }
     override fun <T> updateUniform(info: ShaderUniform<T>): Unit {
